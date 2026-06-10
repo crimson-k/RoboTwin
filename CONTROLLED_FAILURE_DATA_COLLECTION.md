@@ -576,3 +576,114 @@ The experimental principle is:
 In Chinese:
 
 > 我们不是要“收集失败轨迹”，而是要“构造可归因的失败轨迹”。每组失败轨迹只改变一个机制变量，比如 grasp slip、near-miss、wrong object、occlusion 或 temporal truncation。这样才能判断 world model 把失败预测成成功，到底是因为视觉捷径、时序外推、物体绑定错误，还是 evaluator 本身的判别边界问题。
+
+
+• Recommended First Intervention
+
+  Implement unstable_grasp for adjust_bottle_controlled: briefly open the active gripper after lifting the bottle, then replay the original placement motion.
+
+  This is the safest first intervention because it preserves the saved arm-path sequence. During replay, target poses are ignored and arm paths are consumed by call order in envs/
+  _base_task.py:748.
+
+  Task Interface
+
+  Add task-local state in envs/adjust_bottle_controlled.py:7:
+
+  def configure_intervention(self, spec):
+      self.intervention = spec
+      self.intervention_log = []
+      self.current_phase = "setup"
+
+  def maybe_intervene(self, phase, arm_tag):
+      ...
+
+  Use a specification such as:
+
+  intervention:
+    type: unstable_grasp
+    phase: after_lift
+    parameters:
+      gripper_position: 0.35
+      hold_steps: 20
+
+  maybe_intervene() should:
+
+  1. Return immediately for type: none.
+  2. Apply only once at the configured phase.
+  3. Record phase, frame index, control-step information, and parameters.
+  4. Partially open the active gripper.
+  5. Advance simulation for hold_steps.
+  6. Avoid adding any arm movement.
+
+  Task Phases
+
+  Refactor play_once() without changing its existing arm-motion call order:
+
+  self.move(self.grasp_actor(...))
+  self.maybe_intervene("after_grasp", arm_tag)
+
+  self.move(self.move_by_displacement(...))
+  self.maybe_intervene("after_lift", arm_tag)
+
+  self.move(self.place_actor(...))
+  self.maybe_intervene("after_place", arm_tag)
+
+  self.run_verification_horizon()
+
+  The success predicate at envs/adjust_bottle_controlled.py:63 should remain unchanged.
+
+  Add:
+
+  def get_failure_metrics(self):
+      return {
+          "bottle_position": ...,
+          "functional_point_position": ...,
+          "correct_side": ...,
+          "above_height_threshold": ...,
+          "gripper_contact": ...,
+          "linear_speed_mps": ...,
+          "angular_speed_radps": ...,
+      }
+
+  Collector Changes
+
+  The current script/collect_controlled_failures.py:106 is still the standard collector. Change it to:
+
+  1. Require an existing source seed.txt and _traj_data.
+  2. Disable seed searching and planning.
+  3. Run success_reference and each configured failure variant from the same seed and trajectory.
+  4. Give every replay a separate output directory.
+  5. Configure the intervention before play_once().
+  6. Run a fixed post-action verification horizon.
+  7. Call check_success() and collect metrics before close_env().
+  8. Require success for the reference and failure for intervention variants.
+  9. Replace the assertion at line 230 with variant-label validation.
+  10. Write manifest.json, intervention.json, and ground_truth.json.
+
+  Do not load trajectories through the controlled output directory. Add an explicit source_data_path, because load_tran_data() currently reads from self.save_dir.
+
+  Per-Frame State
+
+  Override get_obs() in the controlled task and extend super().get_obs():
+
+  obs["sim_state"] = {
+      "bottle_pose": ...,
+      "bottle_velocity": ...,
+      "intervention_active": np.array(...),
+      "phase_id": np.array(...),
+      "control_step": np.array(...),
+  }
+
+  Numeric arrays will be handled by the existing recursive HDF5 converter.
+
+  Implementation Order
+
+  1. Add controlled_failure_clean.yml.
+  2. Implement configure_intervention(), maybe_intervene(), phases, and metrics.
+  3. Test one seed with type: none and confirm it still succeeds.
+  4. Test unstable_grasp at several opening values.
+  5. Rewrite the collector around source trajectories and per-variant outputs.
+  6. Add manifests and expected-label validation.
+  7. Only then add near-miss or action-noise interventions.
+
+  Near-miss requires modifying the saved joint trajectory or generating a variant trajectory. Merely changing target_pose during replay will not work with the current architecture.

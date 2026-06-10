@@ -4,7 +4,7 @@ import sapien
 import math
 
 
-class adjust_bottle(Base_Task):
+class adjust_bottle_controlled(Base_Task):
 
     def setup_demo(self, **kwags):
         super()._init_task_env_(**kwags)
