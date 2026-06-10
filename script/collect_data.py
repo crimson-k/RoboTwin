@@ -13,7 +13,9 @@ import json
 import traceback
 import os
 import time
+import subprocess
 from argparse import ArgumentParser
+from run_directory import resolve_run_directory
 
 current_file_path = os.path.abspath(__file__)
 parent_directory = os.path.dirname(current_file_path)
@@ -36,7 +38,7 @@ def get_embodiment_config(robot_file):
     return embodiment_args
 
 
-def main(task_name=None, task_config=None):
+def main(task_name=None, task_config=None, run_id=None):
 
     task = class_decorator(task_name)
     config_path = f"./task_config/{task_config}.yml"
@@ -99,7 +101,10 @@ def main(task_name=None, task_config=None):
 
     args["embodiment_name"] = embodiment_name
     args['task_config'] = task_config
-    args["save_path"] = os.path.join(args["save_path"], str(args["task_name"]), args["task_config"])
+    base_save_path = os.path.join(args["save_path"], str(args["task_name"]), args["task_config"])
+    args["run_id"], args["save_path"] = resolve_run_directory(base_save_path, run_id)
+    print(f"\033[95mRun ID:\033[0m {args['run_id']}")
+    print(f"\033[95mSave Path:\033[0m {args['save_path']}")
     run(task, args)
 
 
@@ -229,8 +234,19 @@ def run(TASK_ENV, args):
             TASK_ENV.remove_data_cache()
             assert TASK_ENV.check_success(), "Collect Error"
 
-        command = f"cd description && bash gen_episode_instructions.sh {args['task_name']} {args['task_config']} {args['language_num']}"
-        os.system(command)
+        subprocess.run(
+            [
+                sys.executable,
+                "utils/generate_episode_instructions.py",
+                args["task_name"],
+                args["task_config"],
+                str(args["language_num"]),
+                "--data-dir",
+                os.path.abspath(args["save_path"]),
+            ],
+            cwd=os.path.join(parent_directory, "..", "description"),
+            check=True,
+        )
 
 
 if __name__ == "__main__":
@@ -243,8 +259,13 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("task_name", type=str)
     parser.add_argument("task_config", type=str)
+    parser.add_argument(
+        "--run-id",
+        help="Resume or create a specific run, for example 2 or run_0002. "
+             "If omitted, a new run ID is allocated.",
+    )
     parser = parser.parse_args()
     task_name = parser.task_name
     task_config = parser.task_config
 
-    main(task_name=task_name, task_config=task_config)
+    main(task_name=task_name, task_config=task_config, run_id=parser.run_id)

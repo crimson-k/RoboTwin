@@ -62,16 +62,10 @@ class adjust_bottle_controlled(Base_Task):
                 "hold_steps": hold_steps,
             },
         }
-        original_gripper_position = (
-            self.robot.get_left_gripper_val()
-            if arm_tag == "left"
-            else self.robot.get_right_gripper_val()
-        )
         self.intervention_applied = True
         self.intervention_active = True
         self.move(self.open_gripper(arm_tag, pos=gripper_position))
         self._advance_simulation(hold_steps)
-        self.move(self.close_gripper(arm_tag, pos=original_gripper_position))
         self.intervention_active = False
         event["frame_end"] = self.FRAME_IDX
         event["control_step_end"] = self.control_step

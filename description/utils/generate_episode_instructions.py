@@ -136,9 +136,9 @@ def load_task_instructions(task_name: str) -> Dict[str, Any]:
     return task_data
 
 
-def load_scene_info(task_name: str, setting: str, scene_info_path: str) -> Dict[str, Dict]:
+def load_scene_info(data_dir: str) -> Dict[str, Dict]:
     """Load the scene info from the JSON file in the data directory."""
-    file_path = os.path.join(parent_directory, f"../../{scene_info_path}/{task_name}/{setting}/scene_info.json")
+    file_path = os.path.join(data_dir, "scene_info.json")
     try:
         with open(file_path, "r") as f:
             scene_data = json.load(f)
@@ -162,9 +162,9 @@ def extract_episodes_from_scene_info(scene_info: Dict) -> List[Dict[str, str]]:
     return episodes
 
 
-def save_episode_descriptions(task_name: str, setting: str, generated_descriptions: List[Dict]):
+def save_episode_descriptions(data_dir: str, generated_descriptions: List[Dict]):
     """Save generated descriptions to output files."""
-    output_dir = os.path.join(parent_directory, f"../../data/{task_name}/{setting}/instructions")
+    output_dir = os.path.join(data_dir, "instructions")
     os.makedirs(output_dir, exist_ok=True)
 
     for episode_desc in generated_descriptions:
@@ -256,6 +256,10 @@ if __name__ == "__main__":
         default=100,
         help="Maximum number of descriptions per episode",
     )
+    parser.add_argument(
+        "--data-dir",
+        help="Resolved collection directory containing scene_info.json",
+    )
 
     args = parser.parse_args()
     setting_file = os.path.join(
@@ -264,13 +268,26 @@ if __name__ == "__main__":
     with open(setting_file, "r", encoding="utf-8") as f:
         args_dict = yaml.load(f.read(), Loader=yaml.FullLoader)
 
+    if args.data_dir:
+        data_dir = os.path.abspath(args.data_dir)
+    else:
+        data_dir = os.path.abspath(
+            os.path.join(
+                parent_directory,
+                "../../",
+                args_dict["save_path"],
+                args.task_name,
+                args.setting,
+            )
+        )
+
     # Load scene info and extract episode parameters
-    scene_info = load_scene_info(args.task_name, args.setting, args_dict['save_path'])
+    scene_info = load_scene_info(data_dir)
     episodes = extract_episodes_from_scene_info(scene_info)
 
     # Generate descriptions
     results = generate_episode_descriptions(args.task_name, episodes, args.max_num)
 
     # Save results to output files
-    save_episode_descriptions(args.task_name, args.setting, results)
+    save_episode_descriptions(data_dir, results)
     print("Successfully Saved Instructions")
