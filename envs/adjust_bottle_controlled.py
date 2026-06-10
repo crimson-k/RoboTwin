@@ -5,9 +5,106 @@ import math
 
 
 class adjust_bottle_controlled(Base_Task):
+    PHASE_IDS = {
+        "setup": 0,
+        "after_grasp": 1,
+        "after_lift": 2,
+        "after_place": 3,
+        "verification": 4,
+    }
 
     def setup_demo(self, **kwags):
+        self.configure_intervention({"type": "none"})
+        self.control_step = 0
+        self.intervention_active = False
         super()._init_task_env_(**kwags)
+
+    def configure_intervention(self, spec):
+        spec = spec or {"type": "none"}
+        self.intervention = {
+            "type": spec.get("type", "none"),
+            "phase": spec.get("phase"),
+            "parameters": dict(spec.get("parameters", {})),
+            "verification_steps": int(spec.get("verification_steps", 20)),
+        }
+        self.intervention_log = []
+        self.current_phase = "setup"
+        self.intervention_applied = False
+        self.intervention_active = False
+
+    def maybe_intervene(self, phase, arm_tag):
+        self.current_phase = phase
+        if self.intervention["type"] == "none":
+            return
+        if self.intervention_applied or self.intervention["phase"] != phase:
+            return
+        if self.intervention["type"] != "unstable_grasp":
+            raise ValueError(
+                f"Unsupported intervention type: {self.intervention['type']}"
+            )
+
+        parameters = self.intervention["parameters"]
+        gripper_position = float(parameters.get("gripper_position", 0.35))
+        hold_steps = int(parameters.get("hold_steps", 20))
+        if not 0.0 <= gripper_position <= 1.0:
+            raise ValueError("gripper_position must be in [0, 1]")
+        if hold_steps < 0:
+            raise ValueError("hold_steps must be non-negative")
+
+        event = {
+            "type": "unstable_grasp",
+            "phase": phase,
+            "arm": str(arm_tag),
+            "frame_start": self.FRAME_IDX,
+            "control_step_start": self.control_step,
+            "parameters": {
+                "gripper_position": gripper_position,
+                "hold_steps": hold_steps,
+            },
+        }
+        original_gripper_position = (
+            self.robot.get_left_gripper_val()
+            if arm_tag == "left"
+            else self.robot.get_right_gripper_val()
+        )
+        self.intervention_applied = True
+        self.intervention_active = True
+        self.move(self.open_gripper(arm_tag, pos=gripper_position))
+        self._advance_simulation(hold_steps)
+        self.move(self.close_gripper(arm_tag, pos=original_gripper_position))
+        self.intervention_active = False
+        event["frame_end"] = self.FRAME_IDX
+        event["control_step_end"] = self.control_step
+        self.intervention_log.append(event)
+
+    def _advance_simulation(self, steps):
+        for step in range(steps):
+            self.scene.step()
+            self.control_step += 1
+            if self.render_freq and step % self.render_freq == 0:
+                self._update_render()
+                self.viewer.render()
+            if self.save_freq is not None and step % self.save_freq == 0:
+                self._take_picture()
+
+    def run_verification_horizon(self):
+        self.current_phase = "verification"
+        self._advance_simulation(self.intervention["verification_steps"])
+
+    def take_dense_action(self, control_seq, save_freq=-1):
+        control_lengths = []
+        for key in ("left_arm", "right_arm"):
+            action = control_seq[key]
+            if action is not None:
+                control_lengths.append(action["position"].shape[0])
+        for key in ("left_gripper", "right_gripper"):
+            action = control_seq[key]
+            if action is not None:
+                control_lengths.append(action["num_step"])
+
+        result = super().take_dense_action(control_seq, save_freq=save_freq)
+        self.control_step += max(control_lengths, default=0)
+        return result
 
     def load_actors(self):
         self.qpose_tag = np.random.randint(0, 2)
@@ -34,16 +131,31 @@ class adjust_bottle_controlled(Base_Task):
         self.right_target_pose = [0.25, -0.12, 0.95, 0, 1, 0, 0]
 
     def play_once(self):
-        # Determine which arm to use based on qpose_tag (1 for right, else left)
         arm_tag = ArmTag("right" if self.qpose_tag == 1 else "left")
-        # Select target pose based on qpose_tag (right_target_pose or left_target_pose)
-        target_pose = (self.right_target_pose if self.qpose_tag == 1 else self.left_target_pose)
+        target_pose = (
+            self.right_target_pose
+            if self.qpose_tag == 1
+            else self.left_target_pose
+        )
 
-        # Grasp the bottle with specified arm
-        self.move(self.grasp_actor(self.bottle, arm_tag=arm_tag, pre_grasp_dis=0.1))
-        # Move the arm upward by 0.1 meters along z-axis
-        self.move(self.move_by_displacement(arm_tag=arm_tag, z=0.1, move_axis="arm"))
-        # Place the bottle at target pose (functional point 0) while keeping gripper closed
+        self.move(
+            self.grasp_actor(
+                self.bottle,
+                arm_tag=arm_tag,
+                pre_grasp_dis=0.1,
+            )
+        )
+        self.maybe_intervene("after_grasp", arm_tag)
+
+        self.move(
+            self.move_by_displacement(
+                arm_tag=arm_tag,
+                z=0.1,
+                move_axis="arm",
+            )
+        )
+        self.maybe_intervene("after_lift", arm_tag)
+
         self.move(
             self.place_actor(
                 self.bottle,
@@ -52,7 +164,10 @@ class adjust_bottle_controlled(Base_Task):
                 functional_point_id=0,
                 pre_dis=0.0,
                 is_open=False,
-            ))
+            )
+        )
+        self.maybe_intervene("after_place", arm_tag)
+        self.run_verification_horizon()
 
         self.info["info"] = {
             "{A}": f"001_bottle/base{self.model_id}",
@@ -60,8 +175,77 @@ class adjust_bottle_controlled(Base_Task):
         }
         return self.info
 
+    def _bottle_velocity(self):
+        for component in self.bottle.actor.get_components():
+            if isinstance(component, sapien.physx.PhysxRigidDynamicComponent):
+                return (
+                    np.asarray(component.get_linear_velocity(), dtype=np.float64),
+                    np.asarray(component.get_angular_velocity(), dtype=np.float64),
+                )
+        return np.zeros(3, dtype=np.float64), np.zeros(3, dtype=np.float64)
+
+    def get_failure_metrics(self):
+        bottle_position = np.asarray(self.bottle.get_pose().p, dtype=np.float64)
+        functional_point = np.asarray(
+            self.bottle.get_functional_point(0)[:3],
+            dtype=np.float64,
+        )
+        linear_velocity, angular_velocity = self._bottle_velocity()
+        correct_side = (
+            functional_point[0] < -0.15
+            if self.qpose_tag == 0
+            else functional_point[0] > 0.15
+        )
+
+        return {
+            "bottle_position": bottle_position.tolist(),
+            "functional_point_position": functional_point.tolist(),
+            "correct_side": bool(correct_side),
+            "above_height_threshold": bool(functional_point[2] > 0.9),
+            "gripper_contact": bool(
+                self.get_gripper_actor_contact_position(self.bottle.get_name())
+            ),
+            "linear_speed_mps": float(np.linalg.norm(linear_velocity)),
+            "angular_speed_radps": float(np.linalg.norm(angular_velocity)),
+        }
+
+    def get_obs(self):
+        obs = super().get_obs()
+        if hasattr(self, "bottle"):
+            bottle_pose = self.bottle.get_pose()
+            linear_velocity, angular_velocity = self._bottle_velocity()
+            obs["sim_state"] = {
+                "bottle_pose": np.asarray(
+                    bottle_pose.p.tolist() + bottle_pose.q.tolist(),
+                    dtype=np.float64,
+                ),
+                "bottle_velocity": np.concatenate(
+                    (linear_velocity, angular_velocity)
+                ),
+                "intervention_active": np.asarray(
+                    self.intervention_active,
+                    dtype=np.bool_,
+                ),
+                "phase_id": np.asarray(
+                    self.PHASE_IDS[self.current_phase],
+                    dtype=np.int64,
+                ),
+                "control_step": np.asarray(
+                    self.control_step,
+                    dtype=np.int64,
+                ),
+            }
+        return obs
+
     def check_success(self):
         target_hight = 0.9
         bottle_pose = self.bottle.get_functional_point(0)
-        return ((self.qpose_tag == 0 and bottle_pose[0] < -0.15) or
-                (self.qpose_tag == 1 and bottle_pose[0] > 0.15)) and bottle_pose[2] > target_hight
+        return (
+            (
+                self.qpose_tag == 0
+                and bottle_pose[0] < -0.15
+                or self.qpose_tag == 1
+                and bottle_pose[0] > 0.15
+            )
+            and bottle_pose[2] > target_hight
+        )
