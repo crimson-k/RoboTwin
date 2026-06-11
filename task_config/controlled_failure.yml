@@ -37,6 +37,6 @@ intervention:
   type: unstable_grasp
   phase: after_lift
   parameters:
-    gripper_position: 0.7
+    gripper_position: 1.0
     hold_steps: 50
   verification_steps: 50

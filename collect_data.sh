@@ -9,10 +9,25 @@ run_id=${4:-}
 
 export CUDA_VISIBLE_DEVICES=${gpu_id}
 
+config_path="task_config/${task_config}.yml"
+collector=$(python -c '
+import sys
+import yaml
+
+with open(sys.argv[1], "r", encoding="utf-8") as config_file:
+    config = yaml.safe_load(config_file) or {}
+
+print(
+    "script/collect_controlled_failures.py"
+    if "intervention" in config
+    else "script/collect_data.py"
+)
+' "${config_path}") || exit 1
+
 if [ -n "${run_id}" ]; then
     PYTHONWARNINGS=ignore::UserWarning \
-    python script/collect_data.py "${task_name}" "${task_config}" --run-id "${run_id}"
+    python "${collector}" "${task_name}" "${task_config}" --run-id "${run_id}"
 else
     PYTHONWARNINGS=ignore::UserWarning \
-    python script/collect_data.py "${task_name}" "${task_config}"
+    python "${collector}" "${task_name}" "${task_config}"
 fi
