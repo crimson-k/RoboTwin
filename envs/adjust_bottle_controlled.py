@@ -37,15 +37,21 @@ class adjust_bottle_controlled(Base_Task):
     def _move_with_online_planning(self, actions):
         """Plan an intervention without consuming or extending the replay path."""
         previous_need_plan = self.need_plan
+        previous_plan_success = self.plan_success
         left_path_len = len(self.left_joint_path)
         right_path_len = len(self.right_joint_path)
         self.need_plan = True
         try:
-            return self.move(actions)
+            move_succeeded = self.move(actions)
+            intervention_plan_succeeded = bool(
+                move_succeeded and self.plan_success
+            )
         finally:
             del self.left_joint_path[left_path_len:]
             del self.right_joint_path[right_path_len:]
             self.need_plan = previous_need_plan
+            self.plan_success = previous_plan_success
+        return intervention_plan_succeeded
 
     def maybe_intervene(self, phase, arm_tag):
         self.current_phase = phase
@@ -61,6 +67,9 @@ class adjust_bottle_controlled(Base_Task):
         parameters = self.intervention["parameters"]
         gripper_position = float(parameters.get("gripper_position", 0.35))
         hold_steps = int(parameters.get("hold_steps", 20))
+        x_perturb = float(parameters.get("x_perturb", 0.05))
+        y_perturb = float(parameters.get("y_perturb", 0.05))
+        z_perturb = float(parameters.get("z_perturb", 0.05))
         if not 0.0 <= gripper_position <= 1.0:
             raise ValueError("gripper_position must be in [0, 1]")
         if hold_steps < 0:
@@ -75,6 +84,10 @@ class adjust_bottle_controlled(Base_Task):
             "parameters": {
                 "gripper_position": gripper_position,
                 "hold_steps": hold_steps,
+                "x_perturb": x_perturb,
+                "y_perturb": y_perturb,
+                "z_perturb": z_perturb,
+
             },
         }
         self.intervention_applied = True
@@ -82,15 +95,21 @@ class adjust_bottle_controlled(Base_Task):
         if self.intervention["type"] == "unstable_grasp":
             self.move(self.open_gripper(arm_tag, pos=gripper_position))
         elif self.intervention["type"] == "trajectory_perturbation":
-            self._move_with_online_planning(
+            perturbation_succeeded = self._move_with_online_planning(
                 self.move_by_displacement(
                     arm_tag,
                     move_axis="world",
-                    x=0.05,
-                    y=0.05,
-                    z=0.05,
+                    x=x_perturb,
+                    y=y_perturb,
+                    z=z_perturb,
                 )
             )
+            if not perturbation_succeeded:
+                self.intervention_active = False
+                raise RuntimeError(
+                    "trajectory_perturbation planning failed; refusing to "
+                    "record an episode without the requested perturbation"
+                )
 
         self._advance_simulation(hold_steps)
         self.intervention_active = False
