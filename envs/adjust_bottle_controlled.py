@@ -13,6 +13,8 @@ class adjust_bottle_controlled(Base_Task):
         "verification": 4,
     }
 
+    intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation"]
+
     def setup_demo(self, **kwags):
         self.configure_intervention({"type": "none"})
         self.control_step = 0
@@ -38,7 +40,7 @@ class adjust_bottle_controlled(Base_Task):
             return
         if self.intervention_applied or self.intervention["phase"] != phase:
             return
-        if self.intervention["type"] != "unstable_grasp":
+        if self.intervention["type"] not in self.intervention_types:
             raise ValueError(
                 f"Unsupported intervention type: {self.intervention['type']}"
             )
@@ -52,7 +54,7 @@ class adjust_bottle_controlled(Base_Task):
             raise ValueError("hold_steps must be non-negative")
 
         event = {
-            "type": "unstable_grasp",
+            "type": self.intervention["type"],
             "phase": phase,
             "arm": str(arm_tag),
             "frame_start": self.FRAME_IDX,

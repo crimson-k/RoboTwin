@@ -619,3 +619,33 @@ output directory so all three stages are regenerated together:
 rm -rf data/<task_name>/<task_config>
 bash collect_data.sh <task_name> <task_config> <gpu_id>
 ```
+The arm trajectory is determined in two layers:
+
+  1. Task-level waypoints are defined in play_once():
+      - Grasp approach and grasp: envs/adjust_bottle_controlled.py:137
+      - Lift displacement: envs/adjust_bottle_controlled.py:146
+      - Placement poses: envs/adjust_bottle_controlled.py:155
+
+  2. Actual joint trajectories are computed when need_plan=True:
+      - move() converts actions into planning calls: envs/_base_task.py:884
+      - left_move_to_pose() / right_move_to_pose() invoke the robot planner: envs/_base_task.py:748
+      - robot.left_plan_path() / right_plan_path() use the current joint state and target end-effector pose: envs/robot/robot.py:425
+      - MPLib generates the joint positions and velocities: envs/robot/planner.py:397
+
+  For this task, the active arm normally gets approximately five planned path segments:
+
+  1. Move to pre-grasp pose.
+  2. Move from pre-grasp to grasp.
+  3. Lift by displacement.
+  4. Move toward the placement pose.
+  5. Final placement movement.
+
+  During the initial seed pass, need_plan=True, so these segments are planned and stored in left_joint_path or right_joint_path. They are saved by envs/_base_task.py:527.
+
+  During actual controlled-failure collection, need_plan=False at script/collect_controlled_failures.py:201. The saved paths are loaded at line 222 and consumed sequentially at envs/
+  _base_task.py:752. The newly calculated target poses are effectively ignored.
+
+  Finally, take_dense_action() executes every saved joint position and velocity in simulation: envs/_base_task.py:1407.
+
+  Therefore, the present interventions only change the gripper state. Despite its name, trajectory_perturbation currently does not modify the robot arm trajectory. Implementing it requires
+  altering a saved joint-path segment or introducing a separately planned arm movement.
