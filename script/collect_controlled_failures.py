@@ -36,6 +36,14 @@ def get_embodiment_config(robot_file):
     return embodiment_args
 
 
+def configure_intervention(task_env, spec):
+    if not hasattr(task_env, "configure_intervention"):
+        raise TypeError(
+            f"{type(task_env).__name__} does not support controlled interventions"
+        )
+    task_env.configure_intervention(spec or {"type": "none"})
+
+
 def main(task_name=None, task_config=None):
 
     task = class_decorator(task_name)
@@ -127,6 +135,7 @@ def run(TASK_ENV, args):
         while suc_num < args["episode_num"]:
             try:
                 TASK_ENV.setup_demo(now_ep_num=suc_num, seed=epid, **args)
+                configure_intervention(TASK_ENV, {"type": "none"})
                 TASK_ENV.play_once()
 
                 if TASK_ENV.plan_success and TASK_ENV.check_success():
@@ -203,6 +212,7 @@ def run(TASK_ENV, args):
             print(f"\033[34mTask name: {args['task_name']}\033[0m")
 
             TASK_ENV.setup_demo(now_ep_num=episode_idx, seed=seed_list[episode_idx], **args)
+            configure_intervention(TASK_ENV, args.get("intervention"))
 
             traj_data = TASK_ENV.load_tran_data(episode_idx)
             args["left_joint_path"] = traj_data["left_joint_path"]
