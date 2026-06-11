@@ -630,6 +630,9 @@ The arm trajectory is determined in two layers:
       - move() converts actions into planning calls: envs/_base_task.py:884
       - left_move_to_pose() / right_move_to_pose() invoke the robot planner: envs/_base_task.py:748
       - robot.left_plan_path() / right_plan_path() use the current joint state and target end-effector pose: envs/robot/robot.py:425
+      ->self.left_planner.plan_path 
+      ->left_planner = CuroboPlanner: envs/robot/robot.py:268
+      ->CuroboPlanner.plan_path(): envs/robot/planner.py:93
       - MPLib generates the joint positions and velocities: envs/robot/planner.py:397
 
   For this task, the active arm normally gets approximately five planned path segments:

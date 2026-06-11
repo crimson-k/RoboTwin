@@ -34,6 +34,19 @@ class adjust_bottle_controlled(Base_Task):
         self.intervention_applied = False
         self.intervention_active = False
 
+    def _move_with_online_planning(self, actions):
+        """Plan an intervention without consuming or extending the replay path."""
+        previous_need_plan = self.need_plan
+        left_path_len = len(self.left_joint_path)
+        right_path_len = len(self.right_joint_path)
+        self.need_plan = True
+        try:
+            return self.move(actions)
+        finally:
+            del self.left_joint_path[left_path_len:]
+            del self.right_joint_path[right_path_len:]
+            self.need_plan = previous_need_plan
+
     def maybe_intervene(self, phase, arm_tag):
         self.current_phase = phase
         if self.intervention["type"] == "none":
@@ -66,7 +79,19 @@ class adjust_bottle_controlled(Base_Task):
         }
         self.intervention_applied = True
         self.intervention_active = True
-        self.move(self.open_gripper(arm_tag, pos=gripper_position))
+        if self.intervention["type"] == "unstable_grasp":
+            self.move(self.open_gripper(arm_tag, pos=gripper_position))
+        elif self.intervention["type"] == "trajectory_perturbation":
+            self._move_with_online_planning(
+                self.move_by_displacement(
+                    arm_tag,
+                    move_axis="world",
+                    x=0.05,
+                    y=0.05,
+                    z=0.05,
+                )
+            )
+
         self._advance_simulation(hold_steps)
         self.intervention_active = False
         event["frame_end"] = self.FRAME_IDX
