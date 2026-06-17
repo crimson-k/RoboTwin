@@ -38,4 +38,8 @@ intervention:
   phase: after_lift
   parameters:
     hold_steps: 50
+    x_perturb : 0.02
+    y_perturb : 0
+    z_perturb : 0
+    gripper_position: 0.7
   verification_steps: 50
