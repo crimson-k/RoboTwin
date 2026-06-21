@@ -124,15 +124,18 @@ class Robot:
     def reset(self, scene, need_topp=False, **kwargs):
         self._init_robot_(scene, need_topp, **kwargs)
 
-        if self.communication_flag:
-            if hasattr(self, "left_conn") and self.left_conn:
+        if getattr(self, "communication_flag", False):
+            if (hasattr(self, "left_conn") and self.left_conn
+                    and hasattr(self, "right_conn") and self.right_conn):
                 self.left_conn.send({"cmd": "reset"})
                 _ = self.left_conn.recv()
-            if hasattr(self, "right_conn") and self.right_conn:
                 self.right_conn.send({"cmd": "reset"})
                 _ = self.right_conn.recv()
+            else:
+                self.set_planner(scene=scene)
         else:
-            if not isinstance(self.left_planner, CuroboPlanner) or not isinstance(self.right_planner, CuroboPlanner):
+            if (not isinstance(getattr(self, "left_planner", None), CuroboPlanner)
+                    or not isinstance(getattr(self, "right_planner", None), CuroboPlanner)):
                 self.set_planner(scene=scene)
 
         self.init_joints()
