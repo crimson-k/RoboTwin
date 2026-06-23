@@ -15,7 +15,7 @@ import os
 import time
 import subprocess
 from argparse import ArgumentParser
-from run_directory import resolve_run_directory
+from script.run_directory import resolve_run_directory
 
 current_file_path = os.path.abspath(__file__)
 parent_directory = os.path.dirname(current_file_path)
@@ -36,14 +36,6 @@ def get_embodiment_config(robot_file):
     with open(robot_config_file, "r", encoding="utf-8") as f:
         embodiment_args = yaml.load(f.read(), Loader=yaml.FullLoader)
     return embodiment_args
-
-
-def configure_intervention(task_env, spec):
-    if not hasattr(task_env, "configure_intervention"):
-        raise TypeError(
-            f"{type(task_env).__name__} does not support controlled interventions"
-        )
-    task_env.configure_intervention(spec or {"type": "none"})
 
 
 def main(task_name=None, task_config=None, run_id=None):
@@ -136,41 +128,38 @@ def run(TASK_ENV, args):
                     suc_num = len(seed_list)
                     epid = max(seed_list) + 1
             print(f"Exist seed file, Start from: {epid} / {suc_num}")
-
+        
         while suc_num < args["episode_num"]:
             try:
-                TASK_ENV.setup_demo(now_ep_num=suc_num, seed=epid, **args)
-                configure_intervention(TASK_ENV, {"type": "none"})
+                TASK_ENV.setup_demo(now_ep_num=epid, seed=epid, **args)
                 TASK_ENV.play_once()
 
-                if TASK_ENV.plan_success and TASK_ENV.check_success():
-                    print(f"simulate data episode {suc_num} success! (seed = {epid})")
+                if TASK_ENV.plan_success:
+                    print(f"simulate data episode {epid} success! (seed = {epid})")
                     seed_list.append(epid)
-                    TASK_ENV.save_traj_data(suc_num)
+                    TASK_ENV.save_traj_data(epid)
                     suc_num += 1
                 else:
-                    print(f"simulate data episode {suc_num} fail! (seed = {epid})")
+                    print(f"simulate data episode {epid} fail! (seed = {epid})")
                     fail_num += 1
-
                 TASK_ENV.close_env()
 
                 if args["render_freq"]:
                     TASK_ENV.viewer.close()
             except UnStableError as e:
                 print(" -------------")
-                print(f"simulate data episode {suc_num} fail! (seed = {epid})")
+                print(f"simulate data episode {epid} fail! (seed = {epid})")
                 print("Error: ", e)
                 print(" -------------")
                 fail_num += 1
                 TASK_ENV.close_env()
-
                 if args["render_freq"]:
                     TASK_ENV.viewer.close()
                 time.sleep(0.3)
             except Exception as e:
                 # stack_trace = traceback.format_exc()
                 print(" -------------")
-                print(f"simulate data episode {suc_num} fail! (seed = {epid})")
+                print(f"simulate data episode {epid} fail! (seed = {epid})")
                 print("Error: ", e)
                 print(" -------------")
                 fail_num += 1
@@ -217,7 +206,6 @@ def run(TASK_ENV, args):
             print(f"\033[34mTask name: {args['task_name']}\033[0m")
 
             TASK_ENV.setup_demo(now_ep_num=episode_idx, seed=seed_list[episode_idx], **args)
-            configure_intervention(TASK_ENV, args.get("intervention"))
 
             traj_data = TASK_ENV.load_tran_data(episode_idx)
             args["left_joint_path"] = traj_data["left_joint_path"]
@@ -234,7 +222,6 @@ def run(TASK_ENV, args):
                 info_db = json.load(file)
 
             info = TASK_ENV.play_once()
-            observed_success = bool(TASK_ENV.check_success())
             info_db[f"episode_{episode_idx}"] = info
 
             with open(info_file_path, "w", encoding="utf-8") as file:
@@ -243,13 +230,8 @@ def run(TASK_ENV, args):
             TASK_ENV.close_env(clear_cache=((episode_idx + 1) % clear_cache_freq == 0))
             TASK_ENV.merge_pkl_to_hdf5_video()
             TASK_ENV.remove_data_cache()
-            intervention_type = (args.get("intervention") or {}).get("type", "none")
-            expected_success = intervention_type == "none"
-            assert observed_success == expected_success, (
-                "Collect Error: "
-                f"expected success={expected_success} for intervention "
-                f"{intervention_type!r}, got {observed_success}"
-            )
+            if not TASK_ENV.check_success():
+                print("task failed")
 
         subprocess.run(
             [

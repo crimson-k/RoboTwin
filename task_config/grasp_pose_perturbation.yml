@@ -1,5 +1,5 @@
 render_freq: 0
-episode_num: 1
+episode_num: 3
 use_seed: false
 save_freq: 15
 embodiment:
@@ -34,14 +34,8 @@ clear_cache_freq: 1
 collect_data: true
 eval_video_log: true
 intervention:
-  type: move_to_pose  
-  phase: after_lift
+  type: grasp_pose_perturbation  
   parameters:
-    hold_steps: 0
-    x_perturb : 0
-    y_perturb : 0
-    z_perturb : 0
-    gripper_position: 0.7
-    grasp_displacement: 0.1
-    grasp_displacement_dim: 0
+    grasp_displacement: 0.05
+    grasp_displacement_dim: 1
   verification_steps: 50

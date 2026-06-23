@@ -16,7 +16,7 @@ class adjust_bottle_controlled(Base_Task):
     intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation", "move_to_pose", "grasp_pose_perturbation"]
 
     def setup_demo(self, **kwags):
-        self.configure_intervention({"type": "none"})
+        self.configure_intervention(kwags.get("intervention", {"type": "none"}))
         self.control_step = 0
         self.intervention_active = False
         super()._init_task_env_(**kwags)
@@ -161,13 +161,16 @@ class adjust_bottle_controlled(Base_Task):
         contact_point_id: list | float = None,
     ):
         res_pre_pose, res_pose = super().choose_grasp_pose(actor, arm_tag, pre_dis, target_dis, contact_point_id)
-        if self.intervention["type"] != "grasp_pose_perturbation":
+        if self.intervention["type"] == "grasp_pose_perturbation":
+            grasp_displacement_dim = int(self.intervention["parameters"].get("grasp_displacement_dim", 0))
+            if grasp_displacement_dim not in [0, 1, 2]:
+                raise ValueError("grasp_displacement_dim must be 0, 1, or 2")
+            grasp_displacement = float(self.intervention["parameters"].get("grasp_displacement", 0.0))
+            res_pre_pose[grasp_displacement_dim] += grasp_displacement
+            res_pose[grasp_displacement_dim] += grasp_displacement
             return res_pre_pose, res_pose
         else:
-            res_pose[
-                self.intervention["parameters"].get("grasp_displacement_dim", 0)
-                ] += float(self.intervention["parameters"].get("grasp_displacement", 0.0))
-            return res_pre_pose, res_pose
+            return res_pre_pose, res_pose    
 
     def _advance_simulation(self, steps):
         for step in range(steps):
