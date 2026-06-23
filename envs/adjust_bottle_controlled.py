@@ -13,7 +13,7 @@ class adjust_bottle_controlled(Base_Task):
         "verification": 4,
     }
 
-    intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation", "move_to_pose"]
+    intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation", "move_to_pose", "grasp_pose_perturbation"]
 
     def setup_demo(self, **kwags):
         self.configure_intervention({"type": "none"})
@@ -152,45 +152,7 @@ class adjust_bottle_controlled(Base_Task):
         event["control_step_end"] = self.control_step
         self.intervention_log.append(event)
 
-    def grasp_actor_perturbation(
-        self,
-        actor: Actor,
-        arm_tag: ArmTag,
-        pre_grasp_dis=0.1,
-        grasp_dis=0,
-        gripper_pos=0.0,
-        contact_point_id: list | float = None,
-    ):
-        if not self.plan_success:
-            return None, []
-        if self.need_plan == False:
-            super().grasp_actor(actor, arm_tag=arm_tag, pre_grasp_dis=pre_grasp_dis, grasp_dis=grasp_dis, gripper_pos=gripper_pos, contact_point_id=contact_point_id)
-
-        pre_grasp_pose, grasp_pose = self.choose_grasp_pose_perturbed(
-            actor,
-            arm_tag=arm_tag,
-            pre_dis=pre_grasp_dis,
-            target_dis=grasp_dis,
-            contact_point_id=contact_point_id,
-        )
-        if pre_grasp_pose == grasp_pose:
-            return arm_tag, [
-                Action(arm_tag, "move", target_pose=pre_grasp_pose),
-                Action(arm_tag, "close", target_gripper_pos=gripper_pos),
-            ]
-        else:
-            return arm_tag, [
-                Action(arm_tag, "move", target_pose=pre_grasp_pose),
-                Action(
-                    arm_tag,
-                    "move",
-                    target_pose=grasp_pose,
-                    constraint_pose=[1, 1, 1, 0, 0, 0],
-                ),
-                Action(arm_tag, "close", target_gripper_pos=gripper_pos),
-            ]
-
-    def choose_grasp_pose_perturbed(
+    def choose_grasp_pose(
         self,
         actor: Actor,
         arm_tag: ArmTag,
@@ -198,7 +160,14 @@ class adjust_bottle_controlled(Base_Task):
         target_dis=0,
         contact_point_id: list | float = None,
     ):
-
+        res_pre_pose, res_pose = super().choose_grasp_pose(actor, arm_tag, pre_dis, target_dis, contact_point_id)
+        if self.intervention["type"] != "grasp_pose_perturbation":
+            return res_pre_pose, res_pose
+        else:
+            res_pose[
+                self.intervention["parameters"].get("grasp_displacement_dim", 0)
+                ] += float(self.intervention["parameters"].get("grasp_displacement", 0.0))
+            return res_pre_pose, res_pose
 
     def _advance_simulation(self, steps):
         for step in range(steps):
@@ -260,22 +229,14 @@ class adjust_bottle_controlled(Base_Task):
             if self.qpose_tag == 1
             else self.left_target_pose
         )
-        if(self.intervention["type"] == "grasp_actor_perturbation"):
-            self.move(
-                self.grasp_actor_perturbation(
-                    self.bottle,
-                    arm_tag=arm_tag,
-                    pre_grasp_dis=0.1,
-                )
+
+        self.move(
+            self.grasp_actor(
+                self.bottle,
+                arm_tag=arm_tag,
+                pre_grasp_dis=0.1,
             )
-        else:
-            self.move(
-                self.grasp_actor(
-                    self.bottle,
-                    arm_tag=arm_tag,
-                    pre_grasp_dis=0.1,
-                )
-            )
+        )
 
         self.maybe_intervene("after_grasp", arm_tag)
 
