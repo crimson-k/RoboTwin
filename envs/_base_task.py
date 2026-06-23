@@ -1163,7 +1163,7 @@ class Base_Task(gym.Env):
         if dis_side < 0.15:
             return res_pre_side_pose, res_side_pose
         return res_pre_pose, res_pose
-
+    
     def grasp_actor(
         self,
         actor: Actor,
@@ -1216,7 +1216,7 @@ class Base_Task(gym.Env):
                 ),
                 Action(arm_tag, "close", target_gripper_pos=gripper_pos),
             ]
-
+        
     def get_place_pose(
         self,
         actor: Actor,

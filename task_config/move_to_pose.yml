@@ -42,4 +42,5 @@ intervention:
     y_perturb : 0
     z_perturb : 0
     gripper_position: 0.7
+    grasp_displacement: 0.0
   verification_steps: 50

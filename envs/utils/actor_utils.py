@@ -47,6 +47,7 @@ class Actor:
         if ret == "matrix":
             return world_matrix
         elif ret == "list":
+            # returns a list [x, y, z, qw, qx, qy, qz]
             return (world_matrix[:3, 3].tolist() + t3d.quaternions.mat2quat(world_matrix[:3, :3]).tolist())
         else:
             return sapien.Pose(world_matrix[:3, 3], t3d.quaternions.mat2quat(world_matrix[:3, :3]))
