@@ -14,7 +14,7 @@ def normalize_run_id(run_id):
     if run_id.isdigit():
         return f"run_{int(run_id):04d}"
 
-    match = RUN_DIR_PATTERN.fullmatch(run_id)c
+    match = RUN_DIR_PATTERN.fullmatch(run_id)
     if match:
         return f"run_{int(match.group(1)):04d}"
 

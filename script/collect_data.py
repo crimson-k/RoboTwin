@@ -15,7 +15,7 @@ import os
 import time
 import subprocess
 from argparse import ArgumentParser
-from run_directory import resolve_run_directory
+from script.run_directory import resolve_run_directory
 
 current_file_path = os.path.abspath(__file__)
 parent_directory = os.path.dirname(current_file_path)
