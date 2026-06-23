@@ -1,5 +1,5 @@
 render_freq: 0
-episode_num: 3
+episode_num: 1
 use_seed: false
 save_freq: 15
 embodiment:
@@ -36,6 +36,7 @@ eval_video_log: true
 intervention:
   type: grasp_pose_perturbation  
   parameters:
-    grasp_displacement: 0.05
+    grasp_displacement: -0.05
     grasp_displacement_dim: 1
+    grasp_gripper_opening: 0.05
   verification_steps: 50

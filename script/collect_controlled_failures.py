@@ -115,6 +115,19 @@ def run(TASK_ENV, args):
 
     # =========== Collect Seed ===========
     os.makedirs(args["save_path"], exist_ok=True)
+    
+    def print_plan_failure_debug(task_env):
+        for arm_name, path_attr in (("left", "left_joint_path"), ("right", "right_joint_path")):
+            paths = getattr(task_env, path_attr, [])
+            if not paths:
+                print(f"  {arm_name} planner: no recorded path attempts")
+                continue
+            last_result = paths[-1]
+            status = last_result.get("status") if isinstance(last_result, dict) else None
+            step_count = None
+            if isinstance(last_result, dict) and "position" in last_result:
+                step_count = getattr(last_result["position"], "shape", [len(last_result["position"])])[0]
+            print(f"  {arm_name} planner last status: {status}, steps: {step_count}")
 
     if not args["use_seed"]:
         print("\033[93m" + "[Start Seed and Pre Motion Data Collection]" + "\033[0m")
@@ -141,6 +154,7 @@ def run(TASK_ENV, args):
                     suc_num += 1
                 else:
                     print(f"simulate data episode {epid} fail! (seed = {epid})")
+                    print_plan_failure_debug(TASK_ENV)
                     fail_num += 1
                 TASK_ENV.close_env()
 
