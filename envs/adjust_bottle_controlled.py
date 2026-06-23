@@ -13,7 +13,7 @@ class adjust_bottle_controlled(Base_Task):
         "verification": 4,
     }
 
-    intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation"]
+    intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation", "move_to_pose"]
 
     def setup_demo(self, **kwags):
         self.configure_intervention({"type": "none"})
@@ -34,8 +34,8 @@ class adjust_bottle_controlled(Base_Task):
         self.intervention_applied = False
         self.intervention_active = False
 
-    def _move_with_online_planning(self, actions):
-        """Plan an intervention without consuming or extending the replay path."""
+    def _move_with_online_planning(self, actions, keep_online_planning=False):
+        """Plan an intervention while replay is using saved joint paths."""
         previous_need_plan = self.need_plan
         previous_plan_success = self.plan_success
         left_path_len = len(self.left_joint_path)
@@ -47,10 +47,13 @@ class adjust_bottle_controlled(Base_Task):
                 move_succeeded and self.plan_success
             )
         finally:
-            del self.left_joint_path[left_path_len:]
-            del self.right_joint_path[right_path_len:]
-            self.need_plan = previous_need_plan
-            self.plan_success = previous_plan_success
+            if keep_online_planning:
+                self.need_plan = True
+            else:
+                del self.left_joint_path[left_path_len:]
+                del self.right_joint_path[right_path_len:]
+                self.need_plan = previous_need_plan
+                self.plan_success = previous_plan_success
         return intervention_plan_succeeded
 
     def maybe_intervene(self, phase, arm_tag):
@@ -67,6 +70,7 @@ class adjust_bottle_controlled(Base_Task):
         parameters = self.intervention["parameters"]
         gripper_position = float(parameters.get("gripper_position", 0.35))
         hold_steps = int(parameters.get("hold_steps", 20))
+        hold_at_pose = bool(parameters.get("hold_at_pose", False))
         x_perturb = float(parameters.get("x_perturb", 0.05))
         y_perturb = float(parameters.get("y_perturb", 0.05))
         z_perturb = float(parameters.get("z_perturb", 0.05))
@@ -84,6 +88,7 @@ class adjust_bottle_controlled(Base_Task):
             "parameters": {
                 "gripper_position": gripper_position,
                 "hold_steps": hold_steps,
+                "hold_at_pose": hold_at_pose,
                 "x_perturb": x_perturb,
                 "y_perturb": y_perturb,
                 "z_perturb": z_perturb,
@@ -109,6 +114,36 @@ class adjust_bottle_controlled(Base_Task):
                 raise RuntimeError(
                     "trajectory_perturbation planning failed; refusing to "
                     "record an episode without the requested perturbation"
+                )
+            
+        elif self.intervention["type"] == "move_to_pose":
+            target_pose = np.asarray(
+                self.get_arm_pose(arm_tag=arm_tag),
+                dtype=np.float64,
+            )
+            if arm_tag == 'left':
+                # Set specific position and orientation for left arm
+                target_pose[:2] = [-0.1, -0.05]
+                target_pose[2]  = 1.00
+            else:
+                # Set specific position and orientation for right arm
+                target_pose[:2] = [0.1, -0.05]
+                target_pose[2]  = 1.00
+
+            pose_norm = np.linalg.norm(target_pose[3:])
+            if pose_norm == 0:
+                raise ValueError("move_to_pose target quaternion must be non-zero")
+            target_pose[3:] = target_pose[3:] / pose_norm
+
+            move_succeeded = self._move_with_online_planning(
+                self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
+                keep_online_planning=True,
+            )
+            if not move_succeeded:
+                self.intervention_active = False
+                raise RuntimeError(
+                    "move_to_pose planning failed; refusing to record an "
+                    "episode without the requested intervention"
                 )
 
         self._advance_simulation(hold_steps)

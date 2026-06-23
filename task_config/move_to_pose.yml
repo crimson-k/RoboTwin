@@ -1,15 +1,14 @@
-# if you want to modify the config, please check the following tutorial first:
-# https://robotwin-platform.github.io/doc/usage/configurations.html
 render_freq: 0
 episode_num: 1
 use_seed: false
 save_freq: 15
-embodiment: [aloha-agilex]
+embodiment:
+- aloha-agilex
 language_num: 100
 domain_randomization:
   random_background: false
   cluttered_table: false
-  clean_background_rate: 1
+  clean_background_rate: 0
   random_head_camera_dis: 0
   random_table_height: 0
   random_light: false
@@ -22,16 +21,25 @@ camera:
 data_type:
   rgb: true
   third_view: false
-  depth: false
+  depth: true
   pointcloud: false
-  observer: false
   endpose: true
   qpos: true
   mesh_segmentation: false
-  actor_segmentation: false
+  actor_segmentation: true
 pcd_down_sample_num: 1024
 pcd_crop: true
 save_path: ./data
-clear_cache_freq: 5
+clear_cache_freq: 1
 collect_data: true
 eval_video_log: true
+intervention:
+  type: move_to_pose  
+  phase: after_lift
+  parameters:
+    hold_steps: 0
+    x_perturb : 0
+    y_perturb : 0
+    z_perturb : 0
+    gripper_position: 0.7
+  verification_steps: 50
