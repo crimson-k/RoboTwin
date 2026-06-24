@@ -1,0 +1,247 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "name": "Python: Collect Data",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/script/collect_data.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/policy:${workspaceFolder}/description/utils",
+        "CUDA_VISIBLE_DEVICES": "${input:gpuId}",
+        "PYTHONWARNINGS": "ignore::UserWarning"
+      },
+      "args": [
+        "${input:taskName}",
+        "${input:taskConfig}",
+      ]
+    },
+    {
+      "name": "Python: Collect Controlled Failures",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/script/collect_controlled_failures.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/policy:${workspaceFolder}/description/utils",
+        "CUDA_VISIBLE_DEVICES": "${input:gpuId}",
+        "PYTHONWARNINGS": "ignore::UserWarning"
+      },
+      "args": [
+        "${input:taskName}",
+        "${input:taskConfig}",
+      ]
+    },
+    {
+      "name": "Python: Eval Policy",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/script/eval_policy.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/policy:${workspaceFolder}/description/utils",
+        "CUDA_VISIBLE_DEVICES": "${input:gpuId}",
+        "PYTHONWARNINGS": "ignore::UserWarning"
+      },
+      "args": [
+        "--config",
+        "${workspaceFolder}/policy/${input:policyName}/deploy_policy.yml",
+        "--overrides",
+        "--policy_name",
+        "pi05",
+        "--task_name",
+        "adjust_bottle",
+        "--task_config",
+        "demo_clean",
+        "--ckpt_setting",
+        "${input:ckptSetting}",
+        "--train_config_name",
+        "pi05_base_aloha_lora",
+        "--seed",
+        "${input:seed}",
+        "--instruction_type",
+        "${input:instructionType}"
+      ]
+    },
+    {
+      "name": "Python: Policy Model Server",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/script/policy_model_server.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/policy:${workspaceFolder}/description/utils",
+        "CUDA_VISIBLE_DEVICES": "${input:gpuId}",
+        "PYTHONWARNINGS": "ignore::UserWarning"
+      },
+      "args": [
+        "--port",
+        "${input:serverPort}",
+        "--config",
+        "${workspaceFolder}/policy/${input:policyName}/deploy_policy.yml",
+        "--overrides",
+        "--policy_name",
+        "${input:policyName}",
+        "--task_name",
+        "${input:taskName}",
+        "--task_config",
+        "${input:taskConfig}",
+        "--train_config_name",
+        "pi05_base_aloha_lora",
+        "--ckpt_setting",
+        "${input:ckptSetting}",
+        "--seed",
+        "${input:seed}",
+        "--instruction_type",
+        "${input:instructionType}"
+      ]
+    },
+    {
+      "name": "Python: Eval Policy Client",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/script/eval_policy_client.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/policy:${workspaceFolder}/description/utils",
+        "CUDA_VISIBLE_DEVICES": "${input:gpuId}",
+        "PYTHONWARNINGS": "ignore::UserWarning"
+      },
+      "args": [
+        "--port",
+        "${input:serverPort}",
+        "--config",
+        "${workspaceFolder}/policy/${input:policyName}/deploy_policy.yml",
+        "--overrides",
+        "--train_config_name",
+        "${pi05_base_aloha_lora}",
+        "--policy_name",
+        "${pi05}",
+        "--task_name",
+        "${adjust_bottle}",
+        "--task_config",
+        "${demo_clean}",
+        "--ckpt_setting",
+        "${input:ckptSetting}",
+        "--seed",
+        "${input:seed}",
+        "--instruction_type",
+        "${input:instructionType}"
+      ]
+    },
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/policy:${workspaceFolder}/description/utils"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Python: Server + Eval Client",
+      "configurations": [
+        "Python: Policy Model Server",
+        "Python: Eval Policy Client"
+      ],
+      "stopAll": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "taskName",
+      "type": "promptString",
+      "description": "Task name",
+      "default": "adjust_bottle_controlled"
+    },
+    {
+      "id": "taskConfig",
+      "type": "pickString",
+      "description": "Task config",
+      "options": [
+        "demo_clean",
+        "demo_randomized",
+        "move_waypoint",
+        "trajectory_perturbation",
+        "unstable_grasp",
+        "grasp_pose_perturbation"
+      ],
+      "default": "demo_clean"
+    },
+    {
+      "id": "gpuId",
+      "type": "promptString",
+      "description": "CUDA_VISIBLE_DEVICES value",
+      "default": "0"
+    },
+    {
+      "id": "runId",
+      "type": "promptString",
+      "description": "Run ID for data collection",
+      "default": "debug"
+    },
+    {
+      "id": "policyName",
+      "type": "pickString",
+      "description": "Policy package under policy/",
+      "options": [
+        "Your_Policy",
+        "ACT",
+        "DP",
+        "DP3",
+        "GO1",
+        "RDT",
+        "TinyVLA",
+        "pi0",
+        "pi05",
+        "openvla-oft"
+      ],
+      "default": "Your_Policy"
+    },
+    {
+      "id": "ckptSetting",
+      "type": "promptString",
+      "description": "Checkpoint setting label",
+      "default": "debug"
+    },
+    {
+      "id": "seed",
+      "type": "promptString",
+      "description": "Evaluation seed index",
+      "default": "0"
+    },
+    {
+      "id": "instructionType",
+      "type": "pickString",
+      "description": "Instruction type",
+      "options": [
+        "unseen",
+        "seen"
+      ],
+      "default": "unseen"
+    },
+    {
+      "id": "serverPort",
+      "type": "promptString",
+      "description": "Policy server port",
+      "default": "9999"
+    }
+  ]
+}

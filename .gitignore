@@ -23,7 +23,6 @@ policy/weights/*
 
 envs/curobo/*
 
-.vscode
 /config.json
 
 /*.json*
