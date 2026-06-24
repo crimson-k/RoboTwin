@@ -2,6 +2,7 @@ render_freq: 0
 episode_num: 1
 use_seed: false
 save_freq: 15
+need_plan: true
 embodiment:
 - aloha-agilex
 language_num: 100
@@ -37,6 +38,7 @@ intervention:
   type: move_waypoint
   phase: after_lift
   parameters:
-    traget_pose_left: [0.1, -0.05, 1.00]
+    target_pose_left: [0.1, -0.05, 1.00]
     target_pose_right: [0.1, 0.05, 1.00]
+    quaternion: []
   verification_steps: 50

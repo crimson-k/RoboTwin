@@ -121,7 +121,8 @@ class adjust_bottle_controlled(Base_Task):
                     x=x_perturb,
                     y=y_perturb,
                     z=z_perturb,
-                )
+                ),
+                keep_online_planning = self.need_plan
             )
             if not perturbation_succeeded:
                 self.intervention_active = False
@@ -147,7 +148,7 @@ class adjust_bottle_controlled(Base_Task):
 
             move_succeeded = self._move_with_online_planning(
                 self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
-                keep_online_planning=True,
+                keep_online_planning=self.need_plan,
             )
             if not move_succeeded:
                 self.intervention_active = False
