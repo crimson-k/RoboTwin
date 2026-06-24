@@ -34,11 +34,19 @@ save_path: ./data
 clear_cache_freq: 1
 collect_data: true
 eval_video_log: true
+num_of_intervention_types: 1
 intervention:
   type: move_waypoint
-  phase: after_lift
   parameters:
-    target_pose_left: [0.1, -0.05, 1.00]
-    target_pose_right: [0.1, 0.05, 1.00]
-    gripper_angle: [-pi/6, pi/8, pi/6]
+    num_of_waypoints: 2
+    phase: [after_lift, after_place]
+    waypoint 0:
+      target_pose_left: [0.1, -0.05, 1.00]
+      target_pose_right: [0.1, 0.05, 1.00]
+      gripper_angle: [-pi/6, pi/8, pi/6]
+    waypoint 1:
+      target_pose_left: [-0.2, -0.05, 1.00]
+      target_pose_right: [-0.2, 0.05, 1.00]
+      gripper_angle: [-pi/6, pi/8, pi/6]
   verification_steps: 50
+

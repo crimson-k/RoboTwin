@@ -5,13 +5,6 @@ import math
 
 
 class adjust_bottle_controlled(Base_Task):
-    PHASE_IDS = {
-        "setup": 0,
-        "after_grasp": 1,
-        "after_lift": 2,
-        "after_place": 3,
-        "verification": 4,
-    }
 
     intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation", "move_waypoint", "grasp_pose_perturbation"]
 
@@ -31,6 +24,7 @@ class adjust_bottle_controlled(Base_Task):
         }
         self.current_phase = "setup"
         self.intervention_applied = False
+        self.applied_waypoints = set()
         self.intervention_active = False
 
     def _move_with_online_planning(self, actions, keep_online_planning=False):
@@ -86,23 +80,27 @@ class adjust_bottle_controlled(Base_Task):
         self.current_phase = phase
         if self.intervention["type"] == "none":
             return
-        if self.intervention_applied or self.intervention["phase"] != phase:
-            return
         if self.intervention["type"] not in self.intervention_types:
             raise ValueError(
                 f"Unsupported intervention type: {self.intervention['type']}"
             )
 
         parameters = self.intervention["parameters"]
+        phase_spec = parameters.get("phase", self.intervention.get("phase"))
+        phase_list = phase_spec if isinstance(phase_spec, list) else [phase_spec]
+        if phase not in phase_list:
+            return
+        if self.intervention["type"] != "move_waypoint" and self.intervention_applied:
+            return
+
         gripper_position = float(parameters.get("gripper_position", 0.35))
         hold_steps = int(parameters.get("hold_steps", 20))
         hold_at_pose = bool(parameters.get("hold_at_pose", False))
         x_perturb = float(parameters.get("x_perturb", 0.05))
         y_perturb = float(parameters.get("y_perturb", 0.05))
         z_perturb = float(parameters.get("z_perturb", 0.05))
-        target_pose_left = list(parameters.get("target_pose_left", [0.0, 0.0, 0.0]))
-        target_pose_right = list(parameters.get("target_pose_right", [0.0, 0.0, 0.0]))
-        gripper_angle = list(parameters.get("gripper_angle"))
+        if self.intervention["type"] == "move_waypoint":
+            num_of_waypoints = int(parameters.get("num_of_waypoints", 0))
         
         if not 0.0 <= gripper_position <= 1.0:
             raise ValueError("gripper_position must be in [0, 1]")
@@ -132,32 +130,60 @@ class adjust_bottle_controlled(Base_Task):
                 )
             
         elif self.intervention["type"] == "move_waypoint":
-            target_pose = np.asarray(
-                self.get_arm_pose(arm_tag=arm_tag),
-                dtype=np.float64,
-            )
-            if arm_tag == 'left':
-                target_pose[:3] = target_pose_left
-            else:
-                target_pose[:3] = target_pose_right
-
-            if not gripper_angle:
-                pose_norm = np.linalg.norm(target_pose[3:])
-                if pose_norm == 0:
-                    raise ValueError("move_waypoint target gripper_angle must be non-zero")
-                target_pose[3:] = target_pose[3:] / pose_norm
-            else:
-                target_pose[3:] = transforms.euler_expr_to_quat(gripper_angle)
-
-            move_succeeded = self._move_with_online_planning(
-                self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
-                keep_online_planning=self.need_plan,
-            )
-            if not move_succeeded:
-                self.intervention_active = False
-                raise RuntimeError(
-                    "move_waypoint planning failed; refusing to record an episode without the requested intervention"
+            applied_this_phase = False
+            for i in range(num_of_waypoints):
+                waypoint_key = f"waypoint {i}"
+                waypoint = parameters.get(waypoint_key)
+                if waypoint is None:
+                    raise ValueError(f"Missing move_waypoint config: {waypoint_key}")
+                waypoint = dict(waypoint)
+                intervention_phase = waypoint.get(
+                    "phase",
+                    phase_list[i] if i < len(phase_list) else phase_list[-1],
                 )
+                if intervention_phase != phase:
+                    continue
+                if i in self.applied_waypoints:
+                    continue
+                target_pose = np.asarray(
+                    self.get_arm_pose(arm_tag=arm_tag),
+                    dtype=np.float64,
+                )
+                target_pose_left = waypoint.get("target_pose_left")
+                target_pose_right = waypoint.get("target_pose_right")
+                gripper_angle = waypoint.get("gripper_angle")
+
+                if arm_tag == 'left':
+                    if target_pose_left is None:
+                        raise ValueError(f"{waypoint_key}.target_pose_left is required")
+                    target_pose[:3] = target_pose_left
+                else:
+                    if target_pose_right is None:
+                        raise ValueError(f"{waypoint_key}.target_pose_right is required")
+                    target_pose[:3] = target_pose_right
+
+                if not gripper_angle:
+                    pose_norm = np.linalg.norm(target_pose[3:])
+                    if pose_norm == 0:
+                        raise ValueError("move_waypoint target gripper_angle must be non-zero")
+                    target_pose[3:] = target_pose[3:] / pose_norm
+                else:
+                    target_pose[3:] = transforms.euler_expr_to_quat(gripper_angle)
+
+                move_succeeded = self._move_with_online_planning(
+                    self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
+                    keep_online_planning=self.need_plan,
+                )
+                if not move_succeeded:
+                    self.intervention_active = False
+                    raise RuntimeError(
+                        "move_waypoint planning failed; refusing to record an episode without the requested intervention"
+                    )
+                self.applied_waypoints.add(i)
+                applied_this_phase = True
+            if not applied_this_phase:
+                self.intervention_active = False
+                return
 
         self._advance_simulation(hold_steps)
         self.intervention_active = False
@@ -312,10 +338,6 @@ class adjust_bottle_controlled(Base_Task):
                     self.intervention_active,
                     dtype=np.bool_,
                 ),
-                "phase_id": np.asarray(
-                    self.PHASE_IDS[self.current_phase],
-                    dtype=np.int64,
-                ),
                 "control_step": np.asarray(
                     self.control_step,
                     dtype=np.int64,
@@ -335,3 +357,4 @@ class adjust_bottle_controlled(Base_Task):
             )
             and bottle_pose[2] > target_hight
         )
+    
