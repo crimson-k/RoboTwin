@@ -2,7 +2,85 @@ import numpy as np
 from pathlib import Path
 import sapien.core as sapien
 import transforms3d as t3d
-from typing import Literal
+import ast
+import math
+from typing import Literal, Sequence, Union
+
+
+_ALLOWED_ANGLE_NAMES = {
+    "pi": math.pi,
+    "tau": math.tau,
+    "e": math.e,
+}
+
+
+def _eval_angle_expr(expr: str) -> float:
+    """Evaluate a small arithmetic angle expression such as 'pi/2'."""
+    operators = {
+        ast.Add: lambda a, b: a + b,
+        ast.Sub: lambda a, b: a - b,
+        ast.Mult: lambda a, b: a * b,
+        ast.Div: lambda a, b: a / b,
+        ast.USub: lambda a: -a,
+        ast.UAdd: lambda a: a,
+    }
+
+    def eval_node(node):
+        if isinstance(node, ast.Expression):
+            return eval_node(node.body)
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return float(node.value)
+        if isinstance(node, ast.Name) and node.id in _ALLOWED_ANGLE_NAMES:
+            return _ALLOWED_ANGLE_NAMES[node.id]
+        if isinstance(node, ast.BinOp) and type(node.op) in operators:
+            return operators[type(node.op)](eval_node(node.left), eval_node(node.right))
+        if isinstance(node, ast.UnaryOp) and type(node.op) in operators:
+            return operators[type(node.op)](eval_node(node.operand))
+        raise ValueError(f"Unsupported angle expression: {expr!r}")
+
+    return eval_node(ast.parse(expr, mode="eval"))
+
+
+def _as_angle(value: Union[float, int, str], degrees: bool = False) -> float:
+    angle = _eval_angle_expr(value) if isinstance(value, str) else float(value)
+    return math.radians(angle) if degrees else angle
+
+
+def euler_expr_to_quat(
+    euler: Sequence[Union[float, int, str]],
+    *,
+    axes: str = "sxyz",
+    degrees: bool = False,
+    gimbal_lock_eps: float = 1e-6,
+    return_info: bool = False,
+):
+    """Convert Euler angle expressions to a normalized wxyz quaternion.
+
+    The default axis convention matches transforms3d's roll-pitch-yaw
+    convention: static x, then y, then z. Gimbal lock does not make the
+    quaternion invalid; it means Euler representations around the singular
+    middle angle are ambiguous.
+    """
+    if len(euler) != 3:
+        raise ValueError("Euler input must contain exactly three angles")
+
+    angles = [_as_angle(angle, degrees=degrees) for angle in euler]
+    quat = np.array(t3d.euler.euler2quat(*angles, axes=axes), dtype=np.float64)
+    quat /= np.linalg.norm(quat)
+
+    # For the common roll-pitch-yaw convention, pitch at +/-90 deg is singular.
+    gimbal_locked = False
+    if axes == "sxyz":
+        gimbal_locked = abs(math.cos(angles[1])) <= gimbal_lock_eps
+
+    if not return_info:
+        return quat.tolist()
+    return {
+        "quat_wxyz": quat.tolist(),
+        "euler_radians": angles,
+        "axes": axes,
+        "gimbal_locked": gimbal_locked,
+    }
 
 
 def pause(task, till_close=False, show_point=False):

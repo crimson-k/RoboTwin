@@ -100,9 +100,9 @@ class adjust_bottle_controlled(Base_Task):
         x_perturb = float(parameters.get("x_perturb", 0.05))
         y_perturb = float(parameters.get("y_perturb", 0.05))
         z_perturb = float(parameters.get("z_perturb", 0.05))
-        target_pose_left = list(parameters.get("target_pose_left"), [0.0, 0.0, 0.0])
-        target_pose_right = list(parameters.get("target_pose_right"), [0.0, 0.0, 0.0])
-        quaternion = list(parameters.get("target_pose_right"), None)
+        target_pose_left = list(parameters.get("target_pose_left", [0.0, 0.0, 0.0]))
+        target_pose_right = list(parameters.get("target_pose_right", [0.0, 0.0, 0.0]))
+        gripper_angle = list(parameters.get("gripper_angle"))
         
         if not 0.0 <= gripper_position <= 1.0:
             raise ValueError("gripper_position must be in [0, 1]")
@@ -141,10 +141,13 @@ class adjust_bottle_controlled(Base_Task):
             else:
                 target_pose[:3] = target_pose_right
 
-            pose_norm = np.linalg.norm(target_pose[3:])
-            if pose_norm == 0:
-                raise ValueError("move_waypoint target quaternion must be non-zero")
-            target_pose[3:] = target_pose[3:] / pose_norm
+            if not gripper_angle:
+                pose_norm = np.linalg.norm(target_pose[3:])
+                if pose_norm == 0:
+                    raise ValueError("move_waypoint target gripper_angle must be non-zero")
+                target_pose[3:] = target_pose[3:] / pose_norm
+            else:
+                target_pose[3:] = transforms.euler_expr_to_quat(gripper_angle)
 
             move_succeeded = self._move_with_online_planning(
                 self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
