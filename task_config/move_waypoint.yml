@@ -39,14 +39,14 @@ intervention:
   type: move_waypoint
   parameters:
     num_of_waypoints: 2
-    phase: [after_lift, after_place]
+    phase: [after_lift, after_lift]
     waypoint 0:
       target_pose_left: [0.1, -0.05, 1.00]
       target_pose_right: [0.1, 0.05, 1.00]
-      gripper_angle: [-pi/6, pi/8, pi/6]
+      gripper_angle: []
     waypoint 1:
-      target_pose_left: [-0.2, -0.05, 1.00]
+      target_pose_left: [0.05, -0.05, 1.00]
       target_pose_right: [-0.2, 0.05, 1.00]
-      gripper_angle: [pi/6, -pi/8, -pi/6]
+      gripper_angle: []
   verification_steps: 50
 
