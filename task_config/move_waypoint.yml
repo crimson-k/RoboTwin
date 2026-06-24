@@ -40,5 +40,5 @@ intervention:
   parameters:
     target_pose_left: [0.1, -0.05, 1.00]
     target_pose_right: [0.1, 0.05, 1.00]
-    gripper_angle: [0, pi/2, 0]
+    gripper_angle: [-pi/6, pi/8, pi/6]
   verification_steps: 50

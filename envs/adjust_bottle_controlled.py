@@ -156,8 +156,7 @@ class adjust_bottle_controlled(Base_Task):
             if not move_succeeded:
                 self.intervention_active = False
                 raise RuntimeError(
-                    "move_waypoint planning failed; refusing to record an "
-                    "episode without the requested intervention"
+                    "move_waypoint planning failed; refusing to record an episode without the requested intervention"
                 )
 
         self._advance_simulation(hold_steps)
