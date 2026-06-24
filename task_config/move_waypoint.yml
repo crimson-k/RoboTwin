@@ -34,14 +34,9 @@ clear_cache_freq: 1
 collect_data: true
 eval_video_log: true
 intervention:
-  type: move_to_pose  
+  type: move_waypoint
   phase: after_lift
   parameters:
-    hold_steps: 0
-    x_perturb : 0
-    y_perturb : 0
-    z_perturb : 0
-    gripper_position: 0.7
-    grasp_displacement: 0.1
-    grasp_displacement_dim: 0
+    traget_pose_left: [0.1, -0.05, 1.00]
+    target_pose_right: [0.1, 0.05, 1.00]
   verification_steps: 50

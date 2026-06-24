@@ -13,7 +13,7 @@ class adjust_bottle_controlled(Base_Task):
         "verification": 4,
     }
 
-    intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation", "move_to_pose", "grasp_pose_perturbation"]
+    intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation", "move_waypoint", "grasp_pose_perturbation"]
 
     def setup_demo(self, **kwags):
         self.configure_intervention(kwags.get("intervention", {"type": "none"}))
@@ -29,7 +29,6 @@ class adjust_bottle_controlled(Base_Task):
             "parameters": dict(spec.get("parameters", {})),
             "verification_steps": int(spec.get("verification_steps", 20)),
         }
-        self.intervention_log = []
         self.current_phase = "setup"
         self.intervention_applied = False
         self.intervention_active = False
@@ -56,101 +55,6 @@ class adjust_bottle_controlled(Base_Task):
                 self.plan_success = previous_plan_success
         return intervention_plan_succeeded
 
-    def maybe_intervene(self, phase, arm_tag):
-        self.current_phase = phase
-        if self.intervention["type"] == "none":
-            return
-        if self.intervention_applied or self.intervention["phase"] != phase:
-            return
-        if self.intervention["type"] not in self.intervention_types:
-            raise ValueError(
-                f"Unsupported intervention type: {self.intervention['type']}"
-            )
-
-        parameters = self.intervention["parameters"]
-        gripper_position = float(parameters.get("gripper_position", 0.35))
-        hold_steps = int(parameters.get("hold_steps", 20))
-        hold_at_pose = bool(parameters.get("hold_at_pose", False))
-        x_perturb = float(parameters.get("x_perturb", 0.05))
-        y_perturb = float(parameters.get("y_perturb", 0.05))
-        z_perturb = float(parameters.get("z_perturb", 0.05))
-        if not 0.0 <= gripper_position <= 1.0:
-            raise ValueError("gripper_position must be in [0, 1]")
-        if hold_steps < 0:
-            raise ValueError("hold_steps must be non-negative")
-
-        event = {
-            "type": self.intervention["type"],
-            "phase": phase,
-            "arm": str(arm_tag),
-            "frame_start": self.FRAME_IDX,
-            "control_step_start": self.control_step,
-            "parameters": {
-                "gripper_position": gripper_position,
-                "hold_steps": hold_steps,
-                "hold_at_pose": hold_at_pose,
-                "x_perturb": x_perturb,
-                "y_perturb": y_perturb,
-                "z_perturb": z_perturb,
-
-            },
-        }
-        self.intervention_applied = True
-        self.intervention_active = True
-        if self.intervention["type"] == "unstable_grasp":
-            self.move(self.open_gripper(arm_tag, pos=gripper_position))
-        elif self.intervention["type"] == "trajectory_perturbation":
-            perturbation_succeeded = self._move_with_online_planning(
-                self.move_by_displacement(
-                    arm_tag,
-                    move_axis="world",
-                    x=x_perturb,
-                    y=y_perturb,
-                    z=z_perturb,
-                )
-            )
-            if not perturbation_succeeded:
-                self.intervention_active = False
-                raise RuntimeError(
-                    "trajectory_perturbation planning failed; refusing to "
-                    "record an episode without the requested perturbation"
-                )
-            
-        elif self.intervention["type"] == "move_to_pose":
-            target_pose = np.asarray(
-                self.get_arm_pose(arm_tag=arm_tag),
-                dtype=np.float64,
-            )
-            if arm_tag == 'left':
-                # Set specific position and orientation for left arm
-                target_pose[:2] = [-0.1, -0.05]
-                target_pose[2]  = 1.00
-            else:
-                #Set specific position and orientation for right arm
-                target_pose[:2] = [0.1, -0.05]
-                target_pose[2]  = 1.00
-
-            pose_norm = np.linalg.norm(target_pose[3:])
-            if pose_norm == 0:
-                raise ValueError("move_to_pose target quaternion must be non-zero")
-            target_pose[3:] = target_pose[3:] / pose_norm
-
-            move_succeeded = self._move_with_online_planning(
-                self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
-                keep_online_planning=True,
-            )
-            if not move_succeeded:
-                self.intervention_active = False
-                raise RuntimeError(
-                    "move_to_pose planning failed; refusing to record an "
-                    "episode without the requested intervention"
-                )
-
-        self._advance_simulation(hold_steps)
-        self.intervention_active = False
-        event["frame_end"] = self.FRAME_IDX
-        event["control_step_end"] = self.control_step
-        self.intervention_log.append(event)
 
     def choose_grasp_pose(
         self,
@@ -177,6 +81,83 @@ class adjust_bottle_controlled(Base_Task):
         if self.intervention["type"] == "grasp_pose_perturbation" and gripper_perturb is not None:
             Action(arm_tag, "close", target_gripper_pos=gripper_perturb)
         return super().grasp_actor(actor, arm_tag, pre_grasp_dis, target_dis, contact_point_id=contact_point_id)
+
+    def maybe_intervene(self, phase, arm_tag):
+        self.current_phase = phase
+        if self.intervention["type"] == "none":
+            return
+        if self.intervention_applied or self.intervention["phase"] != phase:
+            return
+        if self.intervention["type"] not in self.intervention_types:
+            raise ValueError(
+                f"Unsupported intervention type: {self.intervention['type']}"
+            )
+
+        parameters = self.intervention["parameters"]
+        gripper_position = float(parameters.get("gripper_position", 0.35))
+        hold_steps = int(parameters.get("hold_steps", 20))
+        hold_at_pose = bool(parameters.get("hold_at_pose", False))
+        x_perturb = float(parameters.get("x_perturb", 0.05))
+        y_perturb = float(parameters.get("y_perturb", 0.05))
+        z_perturb = float(parameters.get("z_perturb", 0.05))
+        target_pose_left = list(parameters.get("target_pose_left"), [0.0, 0.0, 0.0])
+        target_pose_right = list(parameters.get("target_pose_right"), [0.0, 0.0, 0.0])
+        quaternion = list(parameters.get("target_pose_right"), None)
+        
+        if not 0.0 <= gripper_position <= 1.0:
+            raise ValueError("gripper_position must be in [0, 1]")
+        if hold_steps < 0:
+            raise ValueError("hold_steps must be non-negative")
+
+        self.intervention_applied = True
+        self.intervention_active = True
+        if self.intervention["type"] == "unstable_grasp":
+            self.move(self.open_gripper(arm_tag, pos=gripper_position))
+        elif self.intervention["type"] == "trajectory_perturbation":
+            perturbation_succeeded = self._move_with_online_planning(
+                self.move_by_displacement(
+                    arm_tag,
+                    move_axis="world",
+                    x=x_perturb,
+                    y=y_perturb,
+                    z=z_perturb,
+                )
+            )
+            if not perturbation_succeeded:
+                self.intervention_active = False
+                raise RuntimeError(
+                    "trajectory_perturbation planning failed; refusing to "
+                    "record an episode without the requested perturbation"
+                )
+            
+        elif self.intervention["type"] == "move_waypoint":
+            target_pose = np.asarray(
+                self.get_arm_pose(arm_tag=arm_tag),
+                dtype=np.float64,
+            )
+            if arm_tag == 'left':
+                target_pose[:3] = target_pose_left
+            else:
+                target_pose[:3] = target_pose_right
+
+            pose_norm = np.linalg.norm(target_pose[3:])
+            if pose_norm == 0:
+                raise ValueError("move_waypoint target quaternion must be non-zero")
+            target_pose[3:] = target_pose[3:] / pose_norm
+
+            move_succeeded = self._move_with_online_planning(
+                self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
+                keep_online_planning=True,
+            )
+            if not move_succeeded:
+                self.intervention_active = False
+                raise RuntimeError(
+                    "move_waypoint planning failed; refusing to record an "
+                    "episode without the requested intervention"
+                )
+
+        self._advance_simulation(hold_steps)
+        self.intervention_active = False
 
     def _advance_simulation(self, steps):
         for step in range(steps):
