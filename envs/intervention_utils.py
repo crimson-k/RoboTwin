@@ -1,9 +1,8 @@
-from ._base_task import Base_Task
 from .utils import *
 import sapien
 import math
 
-class interventionMixin():
+class InterventionMixin():
 
     intervention_types = [
         "unstable_grasp" ,
@@ -215,7 +214,7 @@ class interventionMixin():
         return result
     
     def _actor_velocity(self):
-        for component in self.bottle.actor.get_components():
+        for component in self.target_actor.actor.get_components():
             if isinstance(component, sapien.physx.PhysxRigidDynamicComponent):
                 return (
                     np.asarray(component.get_linear_velocity(), dtype=np.float64),
@@ -225,15 +224,15 @@ class interventionMixin():
 
     def get_obs(self):
         obs = super().get_obs()
-        if hasattr(self, "bottle"):
-            bottle_pose = self.bottle.get_pose()
-            linear_velocity, angular_velocity = self._bottle_velocity()
+        if hasattr(self, "target_actor"):
+            actor_pose = self.target_actor.get_pose()
+            linear_velocity, angular_velocity = self._actor_velocity()
             obs["sim_state"] = {
-                "bottle_pose": np.asarray(
-                    bottle_pose.p.tolist() + bottle_pose.q.tolist(),
+                "actor_pose": np.asarray(
+                    actor_pose.p.tolist() + actor_pose.q.tolist(),
                     dtype=np.float64,
                 ),
-                "bottle_velocity": np.concatenate(
+                "actor_velocity": np.concatenate(
                     (linear_velocity, angular_velocity)
                 ),
                 "intervention_active": np.asarray(

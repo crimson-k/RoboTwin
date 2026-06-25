@@ -7,8 +7,9 @@ import math
 
 class adjust_bottle_controlled(InterventionMixin, Base_Task):
 
-    intervention_types = ["none", "unstable_grasp" , "trajectory_perturbation", "move_waypoint", "grasp_pose_perturbation"]
-
+    def configure_intervention(self, spec):
+        return super().configure_intervention(spec)
+    
     def setup_demo(self, **kwags):
         self.configure_intervention(kwags.get("intervention", {"type": "none"}))
         self.control_step = 0
@@ -22,7 +23,7 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
 
         self.model_id = np.random.choice([13, 16])
 
-        self.bottle = rand_create_actor(
+        self.target_actor = rand_create_actor(
             self,
             xlim=xlims[self.qpose_tag],
             ylim=[-0.13, -0.08],
@@ -35,10 +36,16 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
             model_id=self.model_id,
         )
         self.delay(4)
-        self.add_prohibit_area(self.bottle, padding=0.15)
+        self.add_prohibit_area(self.target_actor, padding=0.15)
         self.left_target_pose = [-0.25, -0.12, 0.95, 0, 1, 0, 0]
         self.right_target_pose = [0.25, -0.12, 0.95, 0, 1, 0, 0]
 
+    def maybe_intervene(self, phase, arm_tag):
+        return super().maybe_intervene(phase, arm_tag)
+    
+    def grasp_actor(self, actor, arm_tag, pre_grasp_dis=0.1, target_dis=0, contact_point_id = None):
+        return super().grasp_actor(actor, arm_tag, pre_grasp_dis, target_dis, contact_point_id)
+    
     def play_once(self):
         arm_tag = ArmTag("right" if self.qpose_tag == 1 else "left")
         target_pose = (
@@ -49,7 +56,7 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
 
         self.move(
             self.grasp_actor(
-                self.bottle,
+                self.target_actor,
                 arm_tag=arm_tag,
                 pre_grasp_dis=0.1,
             )
@@ -68,7 +75,7 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
 
         self.move(
             self.place_actor(
-                self.bottle,
+                self.target_actor,
                 target_pose=target_pose,
                 arm_tag=arm_tag,
                 functional_point_id=0,
@@ -85,10 +92,12 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
         }
         return self.info
 
-
+    def run_verification_horizon(self):
+        return super().run_verification_horizon()
+    
     def check_success(self):
         target_hight = 0.9
-        bottle_pose = self.bottle.get_functional_point(0)
+        bottle_pose = self.target_actor.get_functional_point(0)
         return (
             (
                 self.qpose_tag == 0
