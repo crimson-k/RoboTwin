@@ -160,7 +160,7 @@ class InterventionMixin():
         if self.current_intervention_id == (self.num_of_interventions - 1):
             return
         self.current_intervention_id += 1
-        self.intervention = self.intervention_list.get("self.current_intervention_id")
+        self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
     
     def _advance_simulation(self, steps):
         for step in range(steps):

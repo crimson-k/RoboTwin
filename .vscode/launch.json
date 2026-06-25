@@ -181,7 +181,8 @@
         "move_waypoint",
         "trajectory_perturbation",
         "unstable_grasp",
-        "grasp_pose_perturbation"
+        "grasp_pose_perturbation",
+        "multiple_intervention"
       ],
       "default": "demo_clean"
     },
