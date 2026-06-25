@@ -44,12 +44,14 @@ class InterventionMixin():
         return np.round(np.asarray(pose, dtype=np.float64), 4).tolist()
 
     def _move_with_online_planning(self, actions, keep_online_planning=False):
-        """Plan an intervention while replay is using saved joint paths."""
+        """Plan interventions during seed search; replay consumes saved paths."""
         previous_need_plan = self.need_plan
         previous_plan_success = self.plan_success
         left_path_len = len(self.left_joint_path)
         right_path_len = len(self.right_joint_path)
-        self.need_plan = True
+        left_cnt = self.left_cnt
+        right_cnt = self.right_cnt
+        self.need_plan = previous_need_plan
         self.last_online_plan_debug = None
         move_succeeded = None
         intervention_plan_succeeded = False
@@ -59,19 +61,24 @@ class InterventionMixin():
                 move_succeeded and self.plan_success
             )
         finally:
-            new_left_results = self.left_joint_path[left_path_len:]
-            new_right_results = self.right_joint_path[right_path_len:]
+            if previous_need_plan:
+                left_results = self.left_joint_path[left_path_len:]
+                right_results = self.right_joint_path[right_path_len:]
+            else:
+                left_results = self.left_joint_path[left_cnt:self.left_cnt]
+                right_results = self.right_joint_path[right_cnt:self.right_cnt]
             self.last_online_plan_debug = {
                 "move_succeeded": move_succeeded,
                 "plan_success_after_move": self.plan_success,
-                "new_left_results": [self._summarize_plan_result(result) for result in new_left_results],
-                "new_right_results": [self._summarize_plan_result(result) for result in new_right_results],
+                "new_left_results": [self._summarize_plan_result(result) for result in left_results],
+                "new_right_results": [self._summarize_plan_result(result) for result in right_results],
             }
             if keep_online_planning:
                 self.need_plan = True
             else:
-                del self.left_joint_path[left_path_len:]
-                del self.right_joint_path[right_path_len:]
+                if previous_need_plan:
+                    del self.left_joint_path[left_path_len:]
+                    del self.right_joint_path[right_path_len:]
                 self.need_plan = previous_need_plan
                 self.plan_success = previous_plan_success
         return intervention_plan_succeeded
