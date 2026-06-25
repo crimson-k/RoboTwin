@@ -56,12 +56,20 @@ class InterventionMixin():
     ):
         res_pre_pose, res_pose = super().choose_grasp_pose(actor, arm_tag, pre_dis, target_dis, contact_point_id)
         if self.intervention["type"] == "grasp_pose_perturbation":
+            self.intervention_active = True
             grasp_displacement_dim = int(self.intervention["parameters"].get("grasp_displacement_dim", 0))
             if grasp_displacement_dim not in [0, 1, 2]:
                 raise ValueError("grasp_displacement_dim must be 0, 1, or 2")
             grasp_displacement = float(self.intervention["parameters"].get("grasp_displacement", 0.0))
             res_pre_pose[grasp_displacement_dim] += grasp_displacement
             res_pose[grasp_displacement_dim] += grasp_displacement
+            
+            self.intervention_applied = True
+            self.intervention_active = False
+            if self.current_intervention_id == (self.num_of_interventions - 1):
+                return
+            self.current_intervention_id += 1
+            self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
             return res_pre_pose, res_pose
         else:
             return res_pre_pose, res_pose
@@ -69,12 +77,13 @@ class InterventionMixin():
     def grasp_actor(self, actor: Actor, arm_tag: ArmTag, pre_grasp_dis=0.1, target_dis=0, contact_point_id: list | float = None):
         gripper_perturb = self.intervention["parameters"].get("grasp_gripper_opening")
         if self.intervention["type"] == "grasp_pose_perturbation" and gripper_perturb is not None:
+            self.intervention_active = True
             Action(arm_tag, "close", target_gripper_pos=gripper_perturb)
         return super().grasp_actor(actor, arm_tag, pre_grasp_dis, target_dis, contact_point_id=contact_point_id)
     
     def maybe_intervene(self, phase, arm_tag):
         self.current_phase = phase
-        if self.intervention["type"] == "none":
+        if self.intervention["type"] == "none" or "grasp_pose_perturbation":
             return
         if self.intervention["type"] not in self.intervention_types:
             raise ValueError(
@@ -86,7 +95,6 @@ class InterventionMixin():
             return
         
         parameters = self.intervention["parameters"]
-        intervention_phase = self.intervention["phase"]
         hold_steps = int(parameters.get("hold_steps", 20))
         if hold_steps < 0:
             raise ValueError("hold_steps must be non-negative")
