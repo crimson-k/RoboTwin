@@ -41,7 +41,7 @@ num_of_interventions: 4
 intervention 0:
   type: grasp_pose_perturbation  
   parameters:
-    grasp_displacement: 0.1
+    grasp_displacement: 0.02
     grasp_displacement_dim: 0
     grasp_gripper_opening: 0.05
 
@@ -59,8 +59,8 @@ intervention 2:
   type: move_waypoint
   phase: after_lift
   parameters:
-    target_pose_left: [0.2, 0.0, 0.9]
-    target_pose_right: [0.2, 0.0, 0.9]
+    target_pose_left: [0.05, -0.18, 1.0]
+    target_pose_right: [0.2, -0.2, 0.9]
     gripper_angle: []
     hold_steps: 50
 

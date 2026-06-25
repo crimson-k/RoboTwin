@@ -128,20 +128,18 @@ class InterventionMixin():
             res_pre_pose[grasp_displacement_dim] += grasp_displacement
             res_pose[grasp_displacement_dim] += grasp_displacement
 
-            if self.current_intervention_id == (self.num_of_interventions - 1):
-                return res_pre_pose, res_pose
-            self.current_intervention_id += 1
-            self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
             return res_pre_pose, res_pose
         else:
             return res_pre_pose, res_pose
 
     def grasp_actor(self, actor: Actor, arm_tag: ArmTag, pre_grasp_dis=0.1, target_dis=0, contact_point_id: list | float = None):
         gripper_perturb = self.intervention["parameters"].get("grasp_gripper_opening")
-        if self.intervention["type"] == "grasp_pose_perturbation" and gripper_perturb is not None:
-            Action(arm_tag, "close", target_gripper_pos=gripper_perturb)
-        return super().grasp_actor(actor, arm_tag, pre_grasp_dis, target_dis, contact_point_id=contact_point_id)
-    
+        actions = super().grasp_actor(actor, arm_tag, pre_grasp_dis, target_dis, gripper_pos = gripper_perturb, contact_point_id=contact_point_id)
+        if self.current_intervention_id != (self.num_of_interventions - 1):
+            self.current_intervention_id += 1
+            self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
+        return actions
+
     def maybe_intervene(self, phase, arm_tag):
         self.current_phase = phase
         if self.intervention["type"] == "none" or self.intervention["type"] == "grasp_pose_perturbation":
