@@ -37,7 +37,15 @@ eval_video_log: true
 
 num_of_interventions: 4
 
+# config must be arranged in time order
 intervention 0:
+  type: grasp_pose_perturbation  
+  parameters:
+    grasp_displacement: 0.1
+    grasp_displacement_dim: 0
+    grasp_gripper_opening: 0.05
+
+intervention 1:
   type: trajectory_perturbation
   phase: after_grasp
   parameters:
@@ -47,20 +55,13 @@ intervention 0:
     z_perturb : 0
     gripper_position: 0.7
 
-intervention 1:
-  type: grasp_pose_perturbation  
-  parameters:
-    grasp_displacement: 0.1
-    grasp_displacement_dim: 0
-    grasp_gripper_opening: 0.05
-
 intervention 2:
   type: move_waypoint
   phase: after_lift
   parameters:
-    target_pose_left: [0.1, -0.05, 1.00]
-    target_pose_right: [0.1, 0.05, 1.00]
-    gripper_angle: [pi/6, pi/8, pi/6]
+    target_pose_left: [0.1, 0.0, 0.80]
+    target_pose_right: [0.1, 0.0, 0.80]
+    gripper_angle: []
     hold_steps: 50
 
 intervention 3:
@@ -69,5 +70,3 @@ intervention 3:
   parameters:
     gripper_position: 1.0
     hold_steps: 50
-
-

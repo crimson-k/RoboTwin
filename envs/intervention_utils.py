@@ -17,8 +17,6 @@ class InterventionMixin():
         self.intervention_list = {}
         for i in range(self.num_of_interventions):
             intervention_data = spec.get(f"intervention {i}", {"type": None})
-            intervention_data["intervention_applied"] = False
-            intervention_data["intervention_active"] = False
             self.intervention_list[f"intervention {i}"] = intervention_data
         self.current_phase = "setup"
         self.current_intervention_id = 0
@@ -55,19 +53,17 @@ class InterventionMixin():
         contact_point_id: list | float = None,
     ):
         res_pre_pose, res_pose = super().choose_grasp_pose(actor, arm_tag, pre_dis, target_dis, contact_point_id)
+
         if self.intervention["type"] == "grasp_pose_perturbation":
-            self.intervention_active = True
             grasp_displacement_dim = int(self.intervention["parameters"].get("grasp_displacement_dim", 0))
             if grasp_displacement_dim not in [0, 1, 2]:
                 raise ValueError("grasp_displacement_dim must be 0, 1, or 2")
             grasp_displacement = float(self.intervention["parameters"].get("grasp_displacement", 0.0))
             res_pre_pose[grasp_displacement_dim] += grasp_displacement
             res_pose[grasp_displacement_dim] += grasp_displacement
-            
-            self.intervention_applied = True
-            self.intervention_active = False
+
             if self.current_intervention_id == (self.num_of_interventions - 1):
-                return
+                return res_pre_pose, res_pose
             self.current_intervention_id += 1
             self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
             return res_pre_pose, res_pose
@@ -77,20 +73,17 @@ class InterventionMixin():
     def grasp_actor(self, actor: Actor, arm_tag: ArmTag, pre_grasp_dis=0.1, target_dis=0, contact_point_id: list | float = None):
         gripper_perturb = self.intervention["parameters"].get("grasp_gripper_opening")
         if self.intervention["type"] == "grasp_pose_perturbation" and gripper_perturb is not None:
-            self.intervention_active = True
             Action(arm_tag, "close", target_gripper_pos=gripper_perturb)
         return super().grasp_actor(actor, arm_tag, pre_grasp_dis, target_dis, contact_point_id=contact_point_id)
     
     def maybe_intervene(self, phase, arm_tag):
         self.current_phase = phase
-        if self.intervention["type"] == "none" or "grasp_pose_perturbation":
+        if self.intervention["type"] == "none" or self.intervention["type"] == "grasp_pose_perturbation":
             return
         if self.intervention["type"] not in self.intervention_types:
             raise ValueError(
                 f"Unsupported intervention type: {self.intervention['type']}"
             )
-        if self.intervention.get("intervention_applied"):
-            return
         if self.intervention["phase"] != self.current_phase:
             return
         
@@ -98,7 +91,6 @@ class InterventionMixin():
         hold_steps = int(parameters.get("hold_steps", 20))
         if hold_steps < 0:
             raise ValueError("hold_steps must be non-negative")
-        self.intervention_active = True
         
         if self.intervention["type"] == "unstable_grasp":
             gripper_position = parameters.get("gripper_position", 0.0)
@@ -121,7 +113,6 @@ class InterventionMixin():
                 keep_online_planning = self.need_plan
             )
             if not perturbation_succeeded:
-                self.intervention_active = False
                 raise RuntimeError(
                     "trajectory_perturbation planning failed; refusing to "
                     "record an episode without the requested perturbation"
@@ -156,19 +147,18 @@ class InterventionMixin():
                 keep_online_planning=self.need_plan,
             )
             if not move_succeeded:
-                self.intervention_active = False
                 raise RuntimeError(
                     "move_waypoint planning failed; refusing to record an episode without the requested intervention"
                 )
 
         self._advance_simulation(hold_steps)
 
-        self.intervention_applied = True
-        self.intervention_active = False
         if self.current_intervention_id == (self.num_of_interventions - 1):
             return
         self.current_intervention_id += 1
         self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
+        if self.intervention.get("phase") == self.current_phase:
+            self.maybe_intervene(self, phase, arm_tag)
     
     def _advance_simulation(self, steps):
         for step in range(steps):
@@ -216,10 +206,6 @@ class InterventionMixin():
                 ),
                 "actor_velocity": np.concatenate(
                     (linear_velocity, angular_velocity)
-                ),
-                "intervention_active": np.asarray(
-                    self.intervention_active,
-                    dtype=np.bool_,
                 ),
                 "control_step": np.asarray(
                     self.control_step,

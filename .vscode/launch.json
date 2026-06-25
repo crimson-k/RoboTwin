@@ -182,7 +182,7 @@
         "trajectory_perturbation",
         "unstable_grasp",
         "grasp_pose_perturbation",
-        "multiple_intervention"
+        "multiple_interventions"
       ],
       "default": "demo_clean"
     },
