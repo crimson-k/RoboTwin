@@ -35,7 +35,7 @@ collect_data: true
 eval_video_log: true
 intervention:
   type: unstable_grasp
-  phase: after_lift
+  phase: [after_lift, after_lift]
   parameters:
     gripper_position: 1.0
     hold_steps: 50

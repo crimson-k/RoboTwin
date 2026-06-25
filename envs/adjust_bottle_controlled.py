@@ -11,7 +11,7 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
         return super().configure_intervention(spec)
     
     def setup_demo(self, **kwags):
-        self.configure_intervention(kwags.get("intervention", {"type": "none"}))
+        self.configure_intervention(kwags)
         self.control_step = 0
         self.intervention_active = False
         super()._init_task_env_(**kwags)
@@ -84,16 +84,12 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
             )
         )
         self.maybe_intervene("after_place", arm_tag)
-        self.run_verification_horizon()
 
         self.info["info"] = {
             "{A}": f"001_bottle/base{self.model_id}",
             "{a}": str(arm_tag),
         }
         return self.info
-
-    def run_verification_horizon(self):
-        return super().run_verification_horizon()
     
     def check_success(self):
         target_hight = 0.9

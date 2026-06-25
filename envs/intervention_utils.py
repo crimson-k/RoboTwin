@@ -13,16 +13,16 @@ class InterventionMixin():
     
     def configure_intervention(self, spec):
         spec = spec or {"type": "none"}
-        self.intervention = {
-            "type": spec.get("type", "none"),
-            "phase": spec.get("phase"),
-            "parameters": dict(spec.get("parameters", {})),
-            "verification_steps": int(spec.get("verification_steps", 20)),
-        }
+        self.num_of_interventions = spec.get("num_of_interventions", 0)
+        self.intervention_list = {}
+        for i in range(self.num_of_interventions):
+            intervention_data = spec.get(f"intervention {i}", {"type": None})
+            intervention_data["intervention_applied"] = False
+            intervention_data["intervention_active"] = False
+            self.intervention_list[f"intervention {i}"] = intervention_data
         self.current_phase = "setup"
-        self.intervention_applied = False
-        self.applied_waypoints = set()
-        self.intervention_active = False
+        self.current_intervention_id = 0
+        self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
 
     def _move_with_online_planning(self, actions, keep_online_planning=False):
         """Plan an intervention while replay is using saved joint paths."""
@@ -80,34 +80,28 @@ class InterventionMixin():
             raise ValueError(
                 f"Unsupported intervention type: {self.intervention['type']}"
             )
-
-        parameters = self.intervention["parameters"]
-        phase_spec = parameters.get("phase", self.intervention.get("phase"))
-        phase_list = phase_spec if isinstance(phase_spec, list) else [phase_spec]
-        if phase not in phase_list:
+        if self.intervention.get("intervention_applied"):
             return
-        if self.intervention["type"] != "move_waypoint" and self.intervention_applied:
+        if self.intervention["phase"] != self.current_phase:
             return
-
-        gripper_position = float(parameters.get("gripper_position", 0.35))
-        hold_steps = int(parameters.get("hold_steps", 20))
-        hold_at_pose = bool(parameters.get("hold_at_pose", False))
-        x_perturb = float(parameters.get("x_perturb", 0.05))
-        y_perturb = float(parameters.get("y_perturb", 0.05))
-        z_perturb = float(parameters.get("z_perturb", 0.05))
-        if self.intervention["type"] == "move_waypoint":
-            num_of_waypoints = int(parameters.get("num_of_waypoints", 0))
         
-        if not 0.0 <= gripper_position <= 1.0:
-            raise ValueError("gripper_position must be in [0, 1]")
+        parameters = self.intervention["parameters"]
+        intervention_phase = self.intervention["phase"]
+        hold_steps = int(parameters.get("hold_steps", 20))
         if hold_steps < 0:
             raise ValueError("hold_steps must be non-negative")
-
-        self.intervention_applied = True
         self.intervention_active = True
+        
         if self.intervention["type"] == "unstable_grasp":
+            gripper_position = parameters.get("gripper_position", 0.0)
+            if not 0.0 <= gripper_position <= 1.0:
+                raise ValueError("gripper_position must be in [0, 1]")
             self.move(self.open_gripper(arm_tag, pos=gripper_position))
+
         elif self.intervention["type"] == "trajectory_perturbation":
+            x_perturb = parameters.get("x_perturb", 0.0)
+            y_perturb = parameters.get("y_perturb", 0.0)
+            z_perturb = parameters.get("z_perturb", 0.0)
             perturbation_succeeded = self._move_with_online_planning(
                 self.move_by_displacement(
                     arm_tag,
@@ -126,63 +120,47 @@ class InterventionMixin():
                 )
             
         elif self.intervention["type"] == "move_waypoint":
-            applied_this_phase = False
-            for i in range(num_of_waypoints):
-                waypoint_key = f"waypoint {i}"
-                waypoint = parameters.get(waypoint_key)
-                if waypoint is None:
-                    raise ValueError(f"Missing move_waypoint config: {waypoint_key}")
-                waypoint = dict(waypoint)
-                intervention_phase = waypoint.get(
-                    "phase",
-                    phase_list[i] if i < len(phase_list) else phase_list[-1],
-                )
-                if intervention_phase != phase:
-                    continue
-                if i in self.applied_waypoints:
-                    continue
-                target_pose = np.asarray(
-                    self.get_arm_pose(arm_tag=arm_tag),
-                    dtype=np.float64,
-                )
-                target_pose_left = waypoint.get("target_pose_left")
-                target_pose_right = waypoint.get("target_pose_right")
-                gripper_angle = waypoint.get("gripper_angle")
+            target_pose = np.asarray(
+                self.get_arm_pose(arm_tag=arm_tag),
+                dtype=np.float64,
+            )
+            target_pose_left = parameters.get("target_pose_left")
+            target_pose_right = parameters.get("target_pose_right")
+            gripper_angle = parameters.get("gripper_angle")
 
-                if arm_tag == 'left':
-                    if target_pose_left is None:
-                        raise ValueError(f"{waypoint_key}.target_pose_left is required")
-                    target_pose[:3] = target_pose_left
-                else:
-                    if target_pose_right is None:
-                        raise ValueError(f"{waypoint_key}.target_pose_right is required")
-                    target_pose[:3] = target_pose_right
+            if arm_tag == 'left':
+                if target_pose_left is None:
+                    target_pose_left == target_pose[:3]
+                target_pose[:3] = target_pose_left
+            else:
+                if target_pose_right is None:
+                    target_pose_right == target_pose[:3]
+                target_pose[:3] = target_pose_right
 
-                if not gripper_angle:
-                    pose_norm = np.linalg.norm(target_pose[3:])
-                    if pose_norm == 0:
-                        raise ValueError("move_waypoint target gripper_angle must be non-zero")
-                    target_pose[3:] = target_pose[3:] / pose_norm
-                else:
-                    target_pose[3:] = transforms.euler_expr_to_quat(gripper_angle)
+            if not gripper_angle:
+                pose_norm = np.linalg.norm(target_pose[3:])
+                target_pose[3:] = target_pose[3:] / pose_norm
+            else:
+                target_pose[3:] = transforms.euler_expr_to_quat(gripper_angle)
 
-                move_succeeded = self._move_with_online_planning(
-                    self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
-                    keep_online_planning=self.need_plan,
-                )
-                if not move_succeeded:
-                    self.intervention_active = False
-                    raise RuntimeError(
-                        "move_waypoint planning failed; refusing to record an episode without the requested intervention"
-                    )
-                self.applied_waypoints.add(i)
-                applied_this_phase = True
-            if not applied_this_phase:
+            move_succeeded = self._move_with_online_planning(
+                self.move_to_pose(arm_tag=arm_tag, target_pose=target_pose),
+                keep_online_planning=self.need_plan,
+            )
+            if not move_succeeded:
                 self.intervention_active = False
-                return
+                raise RuntimeError(
+                    "move_waypoint planning failed; refusing to record an episode without the requested intervention"
+                )
 
         self._advance_simulation(hold_steps)
+
+        self.intervention_applied = True
         self.intervention_active = False
+        if self.current_intervention_id == (self.num_of_interventions - 1):
+            return
+        self.current_intervention_id += 1
+        self.intervention = self.intervention_list.get("self.current_intervention_id")
     
     def _advance_simulation(self, steps):
         for step in range(steps):
@@ -193,10 +171,6 @@ class InterventionMixin():
                 self.viewer.render()
             if self.save_freq is not None and step % self.save_freq == 0:
                 self._take_picture()
-
-    def run_verification_horizon(self):
-        self.current_phase = "verification"
-        self._advance_simulation(self.intervention["verification_steps"])
 
     def take_dense_action(self, control_seq, save_freq=-1):
         control_lengths = []
