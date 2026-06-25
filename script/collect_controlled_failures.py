@@ -146,6 +146,7 @@ def run(TASK_ENV, args):
             try:
                 TASK_ENV.setup_demo(now_ep_num=epid, seed=epid, **args)
                 TASK_ENV.play_once()
+                
 
                 if TASK_ENV.plan_success:
                     print(f"simulate data episode {epid} success! (seed = {epid})")

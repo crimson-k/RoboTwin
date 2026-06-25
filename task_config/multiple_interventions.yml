@@ -59,8 +59,8 @@ intervention 2:
   type: move_waypoint
   phase: after_lift
   parameters:
-    target_pose_left: [0.1, 0.0, 0.80]
-    target_pose_right: [0.1, 0.0, 0.80]
+    target_pose_left: [0.2, 0.0, 0.9]
+    target_pose_right: [0.2, 0.0, 0.9]
     gripper_angle: []
     hold_steps: 50
 
