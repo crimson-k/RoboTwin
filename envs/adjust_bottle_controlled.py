@@ -1,8 +1,6 @@
 from ._base_task import Base_Task
 from .intervention_utils import InterventionMixin
 from .utils import *
-import sapien
-import math
 
 
 class adjust_bottle_controlled(InterventionMixin, Base_Task):

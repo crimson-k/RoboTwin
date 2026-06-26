@@ -62,12 +62,8 @@ class beat_block_hammer(Base_Task):
         # Grasp the hammer with the selected arm
         self.move(self.grasp_actor(self.hammer, arm_tag=arm_tag, pre_grasp_dis=0.12, grasp_dis=0.01))
 
-        self.maybe_intervene("after_grasp", arm_tag)
-
         # Move the hammer upwards
         self.move(self.move_by_displacement(arm_tag, z=0.07, move_axis="arm"))
-
-        self.maybe_intervene("after_lift", arm_tag)
 
         # Place the hammer on the block's functional point (position 1)
         self.move(
@@ -80,8 +76,6 @@ class beat_block_hammer(Base_Task):
                 dis=0,
                 is_open=False,
             ))
-        
-        self.maybe_intervene("after_place", arm_tag)
 
         self.info["info"] = {"{A}": "020_hammer/base0", "{a}": str(arm_tag)}
         return self.info

@@ -1,6 +1,5 @@
 from .utils import *
 import sapien
-import math
 
 class InterventionMixin():
 

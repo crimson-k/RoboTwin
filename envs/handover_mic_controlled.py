@@ -2,8 +2,6 @@ from ._base_task import Base_Task
 from .utils import *
 from ._GLOBAL_CONFIGS import *
 from .intervention_utils import InterventionMixin
-import sapien
-import math
 
 class handover_mic(InterventionMixin, Base_Task):
 
