@@ -4,7 +4,7 @@ import sapien
 class InterventionMixin():
 
     intervention_types = [
-        "unstable_grasp" ,
+        "gripper_perturbation" ,
         "trajectory_perturbation", 
         "move_waypoint", 
         "grasp_pose_perturbation"
@@ -133,7 +133,6 @@ class InterventionMixin():
             grasp_displacement = float(self.intervention["parameters"].get("grasp_displacement", 0.0))
             res_pre_pose[grasp_displacement_dim] += grasp_displacement
             res_pose[grasp_displacement_dim] += grasp_displacement
-
             return res_pre_pose, res_pose
         else:
             return res_pre_pose, res_pose
@@ -162,7 +161,7 @@ class InterventionMixin():
         if hold_steps < 0:
             raise ValueError("hold_steps must be non-negative")
         
-        if self.intervention["type"] == "unstable_grasp":
+        if self.intervention["type"] == "gripper_perturbation":
             gripper_position = parameters.get("gripper_position", 0.0)
             if not 0.0 <= gripper_position <= 1.0:
                 raise ValueError("gripper_position must be in [0, 1]")

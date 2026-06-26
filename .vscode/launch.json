@@ -180,7 +180,7 @@
         "demo_randomized",
         "move_waypoint",
         "trajectory_perturbation",
-        "unstable_grasp",
+        "gripper_perturbation",
         "grasp_pose_perturbation",
         "multiple_interventions"
       ],

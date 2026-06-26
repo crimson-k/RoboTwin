@@ -171,6 +171,7 @@ class Camera:
         # self.static_sensor_camera_list = []
         self.static_camera_name = []
         # static camera list
+
         for i, camera_info in enumerate(self.static_camera_info_list):
             if camera_info.get("forward") == None:
                 camera_info["forward"] = (-1 * np.array(camera_info["position"])).tolist()

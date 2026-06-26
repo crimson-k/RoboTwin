@@ -19,6 +19,13 @@ camera:
   wrist_camera_type: D435
   collect_head_camera: true
   collect_wrist_camera: true
+left_embodiment_config:
+  static_camera_list: [tabletop: {
+      name: tabletop_camera,
+      type: D435,
+      position: [0.4, -0.4, 1.6]
+    }
+  ]
 data_type:
   rgb: true
   third_view: false
@@ -35,19 +42,19 @@ clear_cache_freq: 1
 collect_data: true
 eval_video_log: true
 
-num_of_interventions: 4
+num_of_interventions: 5
 
 # config must be arranged in time order
 intervention 0:
   type: grasp_pose_perturbation  
   parameters:
-    grasp_displacement: 0.02
-    grasp_displacement_dim: 0
+    grasp_displacement: 0.05
+    grasp_displacement_dim: 1
     grasp_gripper_opening: 0.05
 
 intervention 1:
   type: trajectory_perturbation
-  phase: after_grasp
+  phase: after_first_grasp
   parameters:
     hold_steps: 50
     x_perturb : 0.02
@@ -59,14 +66,23 @@ intervention 2:
   type: move_waypoint
   phase: after_lift
   parameters:
-    target_pose_left: [0.05, -0.18, 1.0]
+    target_pose_left: [0.0, -0.18, 1.0]
     target_pose_right: [0.2, -0.2, 0.9]
-    gripper_angle: []
+    gripper_angle: [-pi/6, pi/3, pi/8]
     hold_steps: 50
 
 intervention 3:
-  type: unstable_grasp
-  phase: after_lift
+  type: move_waypoint
+  phase: after_second_grasp
+  parameters:
+    target_pose_left: [0.05, -0.18, 1.0]
+    target_pose_right: [0.05, -0.18, 1.0]
+    gripper_angle: [pi/6, -pi/3, pi/8]
+    hold_steps: 50
+
+intervention 4:
+  type: gripper_perturbation
+  phase: after_handover
   parameters:
     gripper_position: 1.0
     hold_steps: 50

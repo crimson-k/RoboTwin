@@ -3,12 +3,14 @@ from .utils import *
 from ._GLOBAL_CONFIGS import *
 from .intervention_utils import InterventionMixin
 
-class handover_mic(InterventionMixin, Base_Task):
+class handover_mic_controlled(InterventionMixin, Base_Task):
 
     def configure_intervention(self, spec):
         return super().configure_intervention(spec)
     
     def setup_demo(self, **kwags):
+        self.configure_intervention(kwags)
+        self.control_step = 0
         super()._init_task_env_(**kwags)
 
     def maybe_intervene(self, phase, arm_tag):
@@ -60,6 +62,9 @@ class handover_mic(InterventionMixin, Base_Task):
                 contact_point_id=[1, 9, 10, 11, 12, 13, 14, 15],
                 pre_grasp_dis=0.1,
             ))
+        
+        self.maybe_intervene("after_first_grasp", grasp_arm_tag)
+
         # Move the handover arm to a position suitable for handing over the microphone
         self.move(
             self.move_by_displacement(
@@ -69,6 +74,8 @@ class handover_mic(InterventionMixin, Base_Task):
                       if grasp_arm_tag == "left" else GRASP_DIRECTION_DIC["front_left"]),
                 move_axis="arm",
             ))
+        
+        self.maybe_intervene("after_lift", grasp_arm_tag)
         
         # Move the handover arm to the middle position for handover
         self.move(
@@ -82,6 +89,9 @@ class handover_mic(InterventionMixin, Base_Task):
                 is_open=False,
                 constrain="free",
             ))
+        
+        self.maybe_intervene("after_lift", grasp_arm_tag)
+
         # Move the handover arm to grasp the microphone from the grasping arm
         self.move(
             self.grasp_actor(
@@ -90,13 +100,21 @@ class handover_mic(InterventionMixin, Base_Task):
                 contact_point_id=[0, 2, 3, 4, 5, 6, 7, 8],
                 pre_grasp_dis=0.1,
             ))
+        
+        self.maybe_intervene("after_second_grasp", handover_arm_tag)
+
         # Move the grasping arm to open the gripper and lift the microphone
         self.move(self.open_gripper(grasp_arm_tag))
+
+        self.maybe_intervene("after_handover", grasp_arm_tag)
+
         # Move the handover arm to lift the microphone to a height of 0.98
         self.move(
             self.move_by_displacement(grasp_arm_tag, z=0.07, move_axis="arm"),
             self.move_by_displacement(handover_arm_tag, x=0.05 if handover_arm_tag == "right" else -0.05),
         )
+
+        self.maybe_intervene("after_place", grasp_arm_tag)
 
         self.info["info"] = {
             "{A}": f"018_microphone/base{self.microphone_id}",

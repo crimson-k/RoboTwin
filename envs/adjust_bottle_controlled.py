@@ -11,7 +11,6 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
     def setup_demo(self, **kwags):
         self.configure_intervention(kwags)
         self.control_step = 0
-        self.intervention_active = False
         super()._init_task_env_(**kwags)
 
     def load_actors(self):
