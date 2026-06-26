@@ -19,13 +19,6 @@ camera:
   wrist_camera_type: D435
   collect_head_camera: true
   collect_wrist_camera: true
-left_embodiment_config:
-  static_camera_list: [tabletop: {
-      name: tabletop_camera,
-      type: D435,
-      position: [0.4, -0.4, 1.6]
-    }
-  ]
 data_type:
   rgb: true
   third_view: false
