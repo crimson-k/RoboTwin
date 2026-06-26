@@ -51,6 +51,8 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
             else self.left_target_pose
         )
 
+        self.maybe_intervene("before_grasp", arm_tag)
+
         self.move(
             self.grasp_actor(
                 self.target_actor,

@@ -12,6 +12,9 @@ class dummy_task(InterventionMixin, Base_Task):
         self.control_step = 0
         super()._init_task_env_(**kwags)
 
+    def load_actors(self):
+        return
+
     def maybe_intervene(self, phase, arm_tag):
         return super().maybe_intervene(phase, arm_tag)
     
