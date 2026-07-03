@@ -20,8 +20,7 @@ class dummy_task(InterventionMixin, Base_Task):
     
     def play_once(self):
         arm_tag = ArmTag("left")
-
-        self.grasp_actor
+        
         self.maybe_intervene("phase", arm_tag)
 
         return self.info

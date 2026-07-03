@@ -1,5 +1,5 @@
 render_freq: 0
-episode_num: 5
+episode_num: 1
 use_seed: false
 save_freq: 15
 need_plan: true
@@ -13,7 +13,7 @@ domain_randomization:
   random_head_camera_dis: 0
   random_table_height: 0
   random_light: false
-  supervised_light_intervention: true
+  supervised_light_intervention: false
   supervised_light_settings:
     - ambient_light: [0.5, 0.7, 0.3]
     - ambient_light: [0.3, 0.5, 0.6]
@@ -47,47 +47,28 @@ clear_cache_freq: 1
 collect_data: true
 eval_video_log: true
 
-# num_of_interventions: 5
+num_of_interventions: 3
 
-# # config must be arranged in time order
-# intervention 0:
-#   type: grasp_pose_perturbation  
-#   parameters:
-#     grasp_displacement: 0.05
-#     grasp_displacement_dim: 1
-#     grasp_gripper_opening: 0.05
+# config must be arranged in time order
+intervention 0:
+  type: move_waypoint
+  phase: phase
+  parameters:
+    target_pose_left: [0.05, -0.15, 1.0]
+    target_pose_right: [0.2, -0.2, 0.9]
+    gripper_angle: [-pi/6, pi/3, pi/8]
+    hold_steps: 50
 
-# intervention 1:
-#   type: trajectory_perturbation
-#   phase: after_first_grasp
-#   parameters:
-#     hold_steps: 50
-#     x_perturb : 0.02
-#     y_perturb : 0
-#     z_perturb : 0
-#     gripper_position: 0.7
+intervention 1:
+  type: gripper_perturbation
+  phase: phase
+  parameters:
+    gripper_position: 0.0
+  hold_steps: 50
 
-# intervention 2:
-#   type: move_waypoint
-#   phase: after_lift
-#   parameters:
-#     target_pose_left: [0.0, -0.18, 1.0]
-#     target_pose_right: [0.2, -0.2, 0.9]
-#     gripper_angle: [-pi/6, pi/3, pi/8]
-#     hold_steps: 50
-
-# intervention 3:
-#   type: move_waypoint
-#   phase: after_second_grasp
-#   parameters:
-#     target_pose_left: [0.05, -0.18, 1.0]
-#     target_pose_right: [0.05, -0.18, 1.0]
-#     gripper_angle: [pi/6, -pi/3, pi/8]
-#     hold_steps: 50
-
-# intervention 4:
-#   type: gripper_perturbation
-#   phase: after_handover
-#   parameters:
-#     gripper_position: 1.0
-#     hold_steps: 50
+intervention 2:
+  type: gripper_perturbation
+  phase: phase
+  parameters:
+    gripper_position: 1.0
+  hold_steps: 50
