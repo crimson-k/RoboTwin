@@ -19,7 +19,10 @@ class InterventionMixin():
             self.intervention_list[f"intervention {i}"] = intervention_data
         self.current_phase = "setup"
         self.current_intervention_id = 0
-        self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
+        self.intervention = self.intervention_list.get(
+            f"intervention {self.current_intervention_id}",
+            {"type": "none", "parameters": {}},
+        )
 
     def _summarize_plan_result(self, result):
         if not isinstance(result, dict):
@@ -126,11 +129,11 @@ class InterventionMixin():
     ):
         res_pre_pose, res_pose = super().choose_grasp_pose(actor, arm_tag, pre_dis, target_dis, contact_point_id)
 
-        if self.intervention["type"] == "grasp_pose_perturbation":
-            grasp_displacement_dim = int(self.intervention["parameters"].get("grasp_displacement_dim", 0))
+        if self.intervention.get("type") == "grasp_pose_perturbation":
+            grasp_displacement_dim = int(self.intervention.get("parameters", {}).get("grasp_displacement_dim", 0))
             if grasp_displacement_dim not in [0, 1, 2]:
                 raise ValueError("grasp_displacement_dim must be 0, 1, or 2")
-            grasp_displacement = float(self.intervention["parameters"].get("grasp_displacement", 0.0))
+            grasp_displacement = float(self.intervention.get("parameters", {}).get("grasp_displacement", 0.0))
             res_pre_pose[grasp_displacement_dim] += grasp_displacement
             res_pose[grasp_displacement_dim] += grasp_displacement
             return res_pre_pose, res_pose
@@ -138,20 +141,23 @@ class InterventionMixin():
             return res_pre_pose, res_pose
 
     def grasp_actor(self, actor: Actor, arm_tag: ArmTag, pre_grasp_dis=0.1, target_dis=0, contact_point_id: list | float = None):
-        gripper_perturb = self.intervention["parameters"].get("grasp_gripper_opening")
+        gripper_perturb = self.intervention.get("parameters", {}).get("grasp_gripper_opening")
         actions = super().grasp_actor(actor, arm_tag, pre_grasp_dis, target_dis, gripper_pos = gripper_perturb, contact_point_id=contact_point_id)
-        if self.current_intervention_id != (self.num_of_interventions - 1):
+        if self.num_of_interventions > 0 and self.current_intervention_id != (self.num_of_interventions - 1):
             self.current_intervention_id += 1
-            self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
+            self.intervention = self.intervention_list.get(
+                f"intervention {self.current_intervention_id}",
+                {"type": None, "parameters": {}},
+            )
         return actions
 
     def maybe_intervene(self, phase, arm_tag):
         self.current_phase = phase
-        if self.intervention["type"] == "none" or self.intervention["type"] == "grasp_pose_perturbation":
+        if self.intervention.get("type") == "none" or self.intervention.get("type") == "grasp_pose_perturbation":
             return
-        if self.intervention["type"] not in self.intervention_types:
+        if self.intervention.get("type") not in self.intervention_types:
             raise ValueError(
-                f"Unsupported intervention type: {self.intervention['type']}"
+                f"Unsupported intervention type: {self.intervention.get('type')}"
             )
         if self.intervention["phase"] != self.current_phase:
             return
@@ -236,7 +242,10 @@ class InterventionMixin():
         if self.current_intervention_id == (self.num_of_interventions - 1):
             return
         self.current_intervention_id += 1
-        self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
+        self.intervention = self.intervention_list.get(
+            f"intervention {self.current_intervention_id}",
+            {"type": None, "parameters": {}},
+        )
         if self.intervention.get("phase") == self.current_phase:
             self.maybe_intervene(phase, arm_tag)
 

@@ -91,13 +91,15 @@ def pkl_files_to_hdf5_and_video(pkl_files, hdf5_path, video_path):
         left_gripper = np.array([cv2.resize(img, (head.shape[2], head.shape[1])) for img in left_gripper])
     if head.shape[:3] != right_gripper.shape[:3]:
         right_gripper = np.array([cv2.resize(img, (head.shape[2], head.shape[1])) for img in right_gripper])
+    if front.shape[:3] != head.shape[:3]:
+        front = np.array([cv2.resize(img, (head.shape[2], head.shape[1])) for img in front])
     if (2 * head.shape[:3]) != tabletop.shape[:3]:
         tabletop = np.array([cv2.resize(img, (head.shape[2] * 2, head.shape[1] * 2)) for img in tabletop])
 
     row1 = np.concatenate([head, front], axis=2)  
     row2 = np.concatenate([left_gripper, right_gripper], axis=2)  
     stitched = np.concatenate([row1, row2, tabletop], axis=1)
-    images_to_video(stitched, out_path=video_path)
+    images_to_video(head, out_path=video_path)
 
     # images_to_video(np.array(data_list["observation"]["head_camera"]["rgb"]), out_path=video_path)
 
