@@ -82,12 +82,23 @@ class Base_Task(gym.Env):
         self.crazy_random_light_rate = random_setting.get("crazy_random_light_rate", 0)
         self.crazy_random_light = (0 if not self.random_light else np.random.rand() < self.crazy_random_light_rate)
         self.random_embodiment = random_setting.get("random_embodiment", False)  # TODO
+        self.supervised_light_intervention = random_setting.get("supervised_light_intervention", False)
+        supervised_light_settings = random_setting.get("supervised_light_settings", [])
+        self.supervised_light_setting_index = None
+        light_setting_index = kwags.get("supervised_light_setting_index", None)
+        if self.supervised_light_intervention and light_setting_index is not None:
+            if not supervised_light_settings:
+                raise ValueError("supervised_light_intervention=True requires supervised_light_settings")
+            self.supervised_light_setting_index = light_setting_index % len(supervised_light_settings)
+            supervised_light_settings = deepcopy(supervised_light_settings[self.supervised_light_setting_index])
+        else:
+            supervised_light_settings = {}
 
         self.file_path = []
         self.plan_success = True
         self.step_lim = None
         self.fix_gripper = False
-        self.setup_scene()
+        self.setup_scene(**supervised_light_settings)
 
         self.left_js = None
         self.right_js = None

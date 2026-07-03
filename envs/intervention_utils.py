@@ -239,7 +239,7 @@ class InterventionMixin():
         self.intervention = self.intervention_list.get(f"intervention {self.current_intervention_id}")
         if self.intervention.get("phase") == self.current_phase:
             self.maybe_intervene(phase, arm_tag)
-    
+
     def _advance_simulation(self, steps):
         for step in range(steps):
             self.scene.step()

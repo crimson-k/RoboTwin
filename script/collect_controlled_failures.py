@@ -217,12 +217,30 @@ def run(TASK_ENV, args):
         while exist_hdf5(st_idx):
             st_idx += 1
 
-        for episode_idx in range(st_idx, args["episode_num"]):
+        light_settings = args.get("domain_randomization", {}).get("supervised_light_settings", [])
+        use_supervised_light = args.get("domain_randomization", {}).get("supervised_light_intervention", False)
+        if use_supervised_light and not light_settings:
+            raise ValueError("supervised_light_intervention=True requires supervised_light_settings")
+        light_repeat = len(light_settings) if use_supervised_light else 1
+        total_episode_num = args["episode_num"] * light_repeat
+
+        for output_episode_idx in range(st_idx, total_episode_num):
+            episode_idx = output_episode_idx // light_repeat
+            light_setting_index = output_episode_idx % light_repeat
+            source_seed = seed_list[episode_idx]
             print(f"\033[34mTask name: {args['task_name']}\033[0m")
 
-            TASK_ENV.setup_demo(now_ep_num=episode_idx, seed=seed_list[episode_idx], **args)
+            setup_kwargs = {
+                **args,
+                "now_ep_num": output_episode_idx,
+                "seed": source_seed,
+            }
+            if use_supervised_light:
+                setup_kwargs["supervised_light_setting_index"] = light_setting_index
 
-            traj_data = TASK_ENV.load_tran_data(episode_idx)
+            TASK_ENV.setup_demo(**setup_kwargs)
+
+            traj_data = TASK_ENV.load_tran_data(source_seed)
             args["left_joint_path"] = traj_data["left_joint_path"]
             args["right_joint_path"] = traj_data["right_joint_path"]
             TASK_ENV.set_path_lst(args)
@@ -237,12 +255,16 @@ def run(TASK_ENV, args):
                 info_db = json.load(file)
 
             info = TASK_ENV.play_once()
-            info_db[f"episode_{episode_idx}"] = info
+            if use_supervised_light:
+                info["supervised_light_setting_index"] = light_setting_index
+                info["source_episode_idx"] = episode_idx
+                info["source_seed"] = source_seed
+            info_db[f"episode_{output_episode_idx}"] = info
 
             with open(info_file_path, "w", encoding="utf-8") as file:
                 json.dump(info_db, file, ensure_ascii=False, indent=4)
 
-            TASK_ENV.close_env(clear_cache=((episode_idx + 1) % clear_cache_freq == 0))
+            TASK_ENV.close_env(clear_cache=((output_episode_idx + 1) % clear_cache_freq == 0))
             TASK_ENV.merge_pkl_to_hdf5_video()
             TASK_ENV.remove_data_cache()
             if not TASK_ENV.check_success():

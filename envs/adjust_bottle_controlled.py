@@ -42,7 +42,7 @@ class adjust_bottle_controlled(InterventionMixin, Base_Task):
     
     def grasp_actor(self, actor, arm_tag, pre_grasp_dis=0.1, target_dis=0, contact_point_id = None):
         return super().grasp_actor(actor, arm_tag, pre_grasp_dis, target_dis, contact_point_id)
-    
+
     def play_once(self):
         arm_tag = ArmTag("right" if self.qpose_tag == 1 else "left")
         target_pose = (

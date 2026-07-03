@@ -190,7 +190,7 @@
       "id": "gpuId",
       "type": "promptString",
       "description": "CUDA_VISIBLE_DEVICES value",
-      "default": "0"
+      "default": "1"
     },
     {
       "id": "runId",
