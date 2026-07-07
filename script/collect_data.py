@@ -230,7 +230,7 @@ def run(TASK_ENV, args):
                 json.dump(info_db, file, ensure_ascii=False, indent=4)
 
             TASK_ENV.close_env(clear_cache=((episode_idx + 1) % clear_cache_freq == 0))
-            TASK_ENV.merge_pkl_to_hdf5_video()
+            TASK_ENV.merge_pkl_to_hdf5_video(video_fps=args.get("video_fps", 30.0))
             TASK_ENV.remove_data_cache()
             assert TASK_ENV.check_success(), "Collect Error"
 

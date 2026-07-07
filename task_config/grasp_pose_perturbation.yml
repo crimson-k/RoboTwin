@@ -33,6 +33,8 @@ save_path: ./data
 clear_cache_freq: 1
 collect_data: true
 eval_video_log: true
+video_fps: 30
+eval_video_fps: 10
 intervention:
   type: grasp_pose_perturbation  
   parameters:

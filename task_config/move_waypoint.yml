@@ -34,6 +34,8 @@ save_path: ./data
 clear_cache_freq: 1
 collect_data: true
 eval_video_log: true
+video_fps: 30
+eval_video_fps: 10
 num_of_intervention_types: 1
 intervention:
   type: move_waypoint
@@ -49,4 +51,3 @@ intervention:
       target_pose_right: [0.1, 0.05, 1.00]
       gripper_angle: [pi/6, pi/8, pi/6]
   verification_steps: 50
-
