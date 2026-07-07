@@ -55,8 +55,8 @@ intervention 0:
   phase: phase
   parameters:
     target_pose_cube:
-      centre: [0.05, -0.15, 1.0]
-      side_length: 0.05
+      centre: [0.00, -0.15, 1.0]
+      side_length: 0.15
       arm_tag: left
     target_pose_left: [0.2, 0.2, 0.9]
     target_pose_right: [0.2, -0.2, 0.9]
