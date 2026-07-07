@@ -9,13 +9,55 @@ class InterventionMixin():
         "move_waypoint", 
         "grasp_pose_perturbation"
         ]
+
+    def _cube_vertices(self, cube_spec):
+        center = cube_spec.get("center", cube_spec.get("centre"))
+        side_length = cube_spec.get("side_length")
+        if center is None or side_length is None:
+            raise ValueError("target_pose_left_cube needs center/centre and side_length")
+        center = np.asarray(center, dtype=np.float64)
+        if center.shape != (3,):
+            raise ValueError("target_pose_left_cube center/centre must be a 3D position")
+        half_side = float(side_length) / 2.0
+        if half_side <= 0:
+            raise ValueError("target_pose_left_cube side_length must be positive")
+        return [
+            (center + np.asarray([dx, dy, dz], dtype=np.float64)).tolist()
+            for dx in (-half_side, half_side)
+            for dy in (-half_side, half_side)
+            for dz in (-half_side, half_side)
+        ]
+
+    def _resolve_cube_intervention(self, intervention_data, rollout_idx):
+        parameters = intervention_data.get("parameters", {})
+        cube_spec = parameters.get("target_pose_cube")
+        if intervention_data.get("type") != "move_waypoint" or cube_spec is None:
+            return intervention_data
+
+        vertices = self._cube_vertices(cube_spec)
+        vertex_id = int(rollout_idx) % len(vertices)
+        arm_tag = cube_spec.get("arm_tag", "left")
+        new_intervention = intervention_data.copy()
+        new_parameters = parameters.copy()
+        new_parameters.pop("target_pose_cube", None)
+        if arm_tag == "left":
+            new_parameters["target_pose_left"] = vertices[vertex_id]
+        elif arm_tag == "right":
+            new_parameters["target_pose_right"] = vertices[vertex_id]
+        else:
+            raise ValueError(f"Invalid arm_tag: {arm_tag}. Must be 'left' or 'right'.")
+        new_parameters["target_pose_cube_vertex_id"] = vertex_id
+        new_intervention["parameters"] = new_parameters
+        return new_intervention
     
     def configure_intervention(self, spec):
         spec = spec or {"type": "none"}
+        rollout_idx = spec.get("intervention_variant_id", spec.get("now_ep_num", 0))
         self.num_of_interventions = spec.get("num_of_interventions", 0)
         self.intervention_list = {}
         for i in range(self.num_of_interventions):
             intervention_data = spec.get(f"intervention {i}", {"type": None})
+            intervention_data = self._resolve_cube_intervention(intervention_data, rollout_idx)
             self.intervention_list[f"intervention {i}"] = intervention_data
         self.current_phase = "setup"
         self.current_intervention_id = 0
