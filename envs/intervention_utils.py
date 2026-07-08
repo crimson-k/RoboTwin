@@ -242,7 +242,8 @@ class InterventionMixin():
             target_pose = current_pose.copy()
             target_pose_left = parameters.get("target_pose_left")
             target_pose_right = parameters.get("target_pose_right")
-            gripper_angle = parameters.get("gripper_angle")
+            left_gripper_angle = parameters.get("left_gripper_angle")
+            right_gripper_angle = parameters.get("right_gripper_angle")
 
             if arm_tag == 'left':
                 if target_pose_left is None:
@@ -252,6 +253,11 @@ class InterventionMixin():
                 if target_pose_right is None:
                     target_pose_right = target_pose[:3]
                 target_pose[:3] = target_pose_right
+
+            if arm_tag == 'left':
+                gripper_angle = left_gripper_angle
+            else:
+                gripper_angle = right_gripper_angle
 
             if not gripper_angle:
                 pose_norm = np.linalg.norm(target_pose[3:])

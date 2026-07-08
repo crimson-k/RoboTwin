@@ -17,6 +17,8 @@ cd "${repo_dir}"
 
 if [ -f "./script/.update_path.sh" ]; then
     ./script/.update_path.sh > /dev/null 2>&1
+elif [ -f "./script/update_embodiment_config_path.py" ]; then
+    python ./script/update_embodiment_config_path.py > /dev/null 2>&1
 fi
 
 export PYTHONPATH="${repo_dir}:${repo_dir}/policy:${repo_dir}/description/utils${PYTHONPATH:+:${PYTHONPATH}}"

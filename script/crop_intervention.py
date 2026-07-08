@@ -20,13 +20,6 @@ PLANNED_INTERVENTION_PATH_COUNTS = {
 
 def resolve_default_run_dir(task_name, task_config):
     base_dir = os.path.join("data", task_name, task_config)
-    latest_path = os.path.join(base_dir, "latest_run.txt")
-    if os.path.exists(latest_path):
-        with open(latest_path, "r", encoding="utf-8") as f:
-            latest = f.read().strip()
-        if latest:
-            return os.path.join(base_dir, latest)
-
     runs = [
         name
         for name in os.listdir(base_dir)

@@ -19,7 +19,7 @@ class dummy_task(InterventionMixin, Base_Task):
         return super().maybe_intervene(phase, arm_tag)
     
     def play_once(self):
-        arm_tag = ArmTag("left")
+        arm_tag = ArmTag("right")
         
         self.maybe_intervene("phase", arm_tag)
 
