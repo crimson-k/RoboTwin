@@ -48,6 +48,18 @@ def main(task_name=None, task_config=None, run_id=None):
 
     args['task_name'] = task_name
 
+    if task_name == "dummy_task" and args.get("actor_model_sweep"):
+        from envs.dummy_task import get_actor_source_model_ids
+        actor_model_ids = get_actor_source_model_ids(args.get("actor_source"))
+        if not actor_model_ids:
+            raise ValueError(f"Could not infer actor model ids from actor_source={args.get('actor_source')}")
+        actor_model_repeat = int(args.get("actor_model_repeat", 8))
+        args["episode_num"] = len(actor_model_ids) * actor_model_repeat
+        print(
+            f"\033[95mActor model sweep:\033[0m {actor_model_ids} x "
+            f"{actor_model_repeat} repeats = {args['episode_num']} episodes"
+        )
+
     embodiment_type = args.get("embodiment")
     embodiment_config_path = os.path.join(CONFIGS_PATH, "_embodiment_config.yml")
 
@@ -144,7 +156,14 @@ def run(TASK_ENV, args):
         
         while suc_num < args["episode_num"]:
             try:
-                TASK_ENV.setup_demo(now_ep_num=epid, seed=epid, **args)
+                setup_kwargs = {
+                    **args,
+                    "now_ep_num": epid,
+                    "seed": epid,
+                }
+                if args.get("actor_model_sweep"):
+                    setup_kwargs["intervention_variant_id"] = suc_num
+                TASK_ENV.setup_demo(**setup_kwargs)
                 TASK_ENV.play_once()
                 
 
@@ -235,6 +254,8 @@ def run(TASK_ENV, args):
                 "now_ep_num": output_episode_idx,
                 "seed": source_seed,
             }
+            if args.get("actor_model_sweep"):
+                setup_kwargs["intervention_variant_id"] = output_episode_idx
             if use_supervised_light:
                 setup_kwargs["supervised_light_setting_index"] = light_setting_index
 

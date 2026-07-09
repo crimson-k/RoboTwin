@@ -1,9 +1,11 @@
 render_freq: 0
-episode_num: 32
+episode_num: 1
 use_seed: false
 save_freq: 15
 need_plan: true
 actor_source: adjust_bottle
+actor_model_sweep: true
+actor_model_repeat: 8
 embodiment:
 - aloha-agilex
 language_num: 100
@@ -61,6 +63,8 @@ intervention 0:
       centre: [0.00, -0.15, 1.0]
       side_length: 0.15
       arm_tag: left
+    target_pose_left: [0.0, -0.15, 1.0]
+    target_pose_right: [0.0, -0.15, 1.0]
     left_gripper_angle: [-pi/6, pi/3, pi/8]
     right_gripper_angle: [-pi/6, pi/3, 2*pi/3]
     hold_steps: 50
