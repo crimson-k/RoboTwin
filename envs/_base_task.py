@@ -68,6 +68,7 @@ class Base_Task(gym.Env):
         self.save_data = kwags.get("save_data", False)
         self.dual_arm = kwags.get("dual_arm", True)
         self.eval_mode = kwags.get("eval_mode", False)
+        self.actor_source = kwags.get("actor_source", None)
 
         self.need_topp = True  # TODO
 
